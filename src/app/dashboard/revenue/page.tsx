@@ -5,6 +5,7 @@ import { useFarmStore } from '@/store/useFarmStore';
 import Modal from '@/components/Modal';
 import TiltCard from '@/components/TiltCard';
 import AnimatedCounter from '@/components/AnimatedCounter';
+import SaleInvoiceModal from '@/components/SaleInvoiceModal';
 import {
   DollarSign,
   TrendingUp,
@@ -17,7 +18,9 @@ import {
   Percent,
   Download,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  Printer,
+  FileText
 } from 'lucide-react';
 
 const emptySaleForm = {
@@ -42,6 +45,8 @@ export default function RevenuePage() {
   } = useFarmStore();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedSaleForInvoice, setSelectedSaleForInvoice] = useState<any | null>(null);
+  const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
   const [form, setForm] = useState(emptySaleForm);
   const [saving, setSaving] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -314,10 +319,21 @@ export default function RevenuePage() {
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2.5">
                     <span className="text-base font-extrabold text-emerald-400 whitespace-nowrap">
                       + {currency} {sale.totalRevenue.toLocaleString('en-IN')}
                     </span>
+                    <button
+                      onClick={() => {
+                        setSelectedSaleForInvoice(sale);
+                        setIsInvoiceOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                      title="Generate Printable Wholesale Invoice / Challan"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">Print Receipt</span>
+                    </button>
                     <button
                       onClick={() => handleDelete(sale.id, sale.buyer)}
                       className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
@@ -469,6 +485,13 @@ export default function RevenuePage() {
           </form>
         </Modal>
       )}
+
+      {/* Printable Invoice / Delivery Challan Modal */}
+      <SaleInvoiceModal
+        isOpen={isInvoiceOpen}
+        onClose={() => setIsInvoiceOpen(false)}
+        sale={selectedSaleForInvoice}
+      />
     </div>
   );
 }

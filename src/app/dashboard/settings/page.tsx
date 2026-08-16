@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import TiltCard from '@/components/TiltCard';
+import BackupRestoreModal from '@/components/BackupRestoreModal';
 
 export default function SettingsPage() {
   const {
@@ -39,6 +40,7 @@ export default function SettingsPage() {
   const [language, setLanguage] = useState(settings.language || 'en');
   const [location, setLocation] = useState(settings.location || 'Hyderabad, India');
   const [savedMsg, setSavedMsg] = useState('');
+  const [showBackupModal, setShowBackupModal] = useState(false);
 
   const isLiquid = theme === 'obsidian' || theme === 'liquid-glass' || theme === 'liquid';
 
@@ -359,14 +361,20 @@ export default function SettingsPage() {
         <div className="flex flex-wrap items-center gap-3">
           <button
             type="button"
-            onClick={handleBackup}
-            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-all"
+            onClick={() => setShowBackupModal(true)}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-xs font-bold text-white shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
           >
-            <Download className="w-3.5 h-3.5 text-emerald-500" />
-            <span>Download Database Backup (JSON)</span>
+            <Database className="w-3.5 h-3.5" />
+            <span>Open Backup & Cloud Restore Manager</span>
           </button>
         </div>
       </div>
+
+      {/* Backup & Restore Modal */}
+      <BackupRestoreModal
+        isOpen={showBackupModal}
+        onClose={() => setShowBackupModal(false)}
+      />
     </div>
   );
 }

@@ -43,6 +43,10 @@ import {
 } from 'recharts';
 
 import Floating3DChicken from '@/components/Floating3DChicken';
+import WhatsAppReportModal from '@/components/WhatsAppReportModal';
+import FlockHealthAdvisor from '@/components/FlockHealthAdvisor';
+import FeedForecastWidget from '@/components/FeedForecastWidget';
+import { Send } from 'lucide-react';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -82,6 +86,7 @@ export default function DashboardPage() {
   } = useFarmStore();
 
   const [mounted, setMounted] = useState(false);
+  const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -256,11 +261,21 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5 sm:gap-3">
+          <button
+            onClick={() => setShowWhatsAppModal(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-white bg-emerald-600 hover:bg-emerald-500 shadow-md shadow-emerald-600/20 transition-all cursor-pointer"
+            title="Dispatch 1-Click WhatsApp Daily Briefing to John and Pranay"
+          >
+            <Send className="w-4 h-4" />
+            <span className="hidden sm:inline">WhatsApp Dispatch</span>
+            <span className="sm:hidden">Brief</span>
+          </button>
+
           <button
             onClick={() => fetchDashboardData()}
             disabled={loading}
-            className={`p-2.5 rounded-2xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] transition-all ${
+            className={`p-2.5 rounded-2xl border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] bg-[var(--bg-card)] transition-all cursor-pointer ${
               loading ? 'animate-spin' : 'hover:scale-105'
             }`}
             title="Refresh database data"
@@ -270,14 +285,14 @@ export default function DashboardPage() {
 
           <Link
             href="/dashboard/billing"
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all shadow-md ${
+            className={`flex items-center gap-2 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold transition-all shadow-md ${
               isLiquid
                 ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-500/30'
                 : 'bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] hover:bg-[var(--bg-card-hover)]'
             }`}
           >
             <Sparkles className="w-4 h-4 text-cyan-400" />
-            <span>Billing Calc</span>
+            <span className="hidden sm:inline">Billing Calc</span>
           </Link>
 
           <Link
@@ -359,6 +374,12 @@ export default function DashboardPage() {
           );
         })}
       </motion.div>
+
+      {/* AI Health Diagnostic & Feed Depletion Forecast Productivity Suite */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <FlockHealthAdvisor />
+        <FeedForecastWidget />
+      </div>
 
       {/* Analytics & Financial Visualizations */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -595,6 +616,12 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* WhatsApp Executive Summary Dispatch Modal */}
+      <WhatsAppReportModal
+        isOpen={showWhatsAppModal}
+        onClose={() => setShowWhatsAppModal(false)}
+      />
     </div>
   );
 }

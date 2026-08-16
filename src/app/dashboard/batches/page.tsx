@@ -20,10 +20,13 @@ import {
   DollarSign,
   CheckCircle,
   Wheat,
-  Scale
+  Scale,
+  Syringe,
+  Award
 } from 'lucide-react';
 import TiltCard from '@/components/TiltCard';
 import { motion, AnimatePresence } from 'framer-motion';
+import FlockCalendar from '@/components/FlockCalendar';
 
 const emptyBatchForm = {
   batchNumber: '',
@@ -42,6 +45,8 @@ export default function BatchesPage() {
   const {
     theme,
     batches,
+    loading,
+    error,
     fetchBatches,
     createBatch,
     updateBatch,
@@ -56,6 +61,8 @@ export default function BatchesPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showDailyRecordModal, setShowDailyRecordModal] = useState(false);
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedBatchForSchedule, setSelectedBatchForSchedule] = useState<Batch | null>(null);
 
   const [selectedBatchId, setSelectedBatchId] = useState<string | null>(null);
   const [form, setForm] = useState(emptyBatchForm);
@@ -211,17 +218,31 @@ export default function BatchesPage() {
           </p>
         </div>
 
-        <button
-          onClick={handleOpenCreateModal}
-          className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white transition-all shadow-md active:scale-95 ${
-            isLiquid
-              ? 'bg-gradient-to-r from-violet-600 via-cyan-600 to-emerald-500 hover:opacity-90 shadow-violet-500/20'
-              : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'
-          }`}
-        >
-          <Plus className="w-4 h-4" />
-          <span>New Batch</span>
-        </button>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => {
+              setSelectedBatchForSchedule(batches.find((b) => b.status === 'growing') || batches[0] || null);
+              setShowScheduleModal(true);
+            }}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer"
+          >
+            <Calendar className="w-4 h-4" />
+            <span className="hidden sm:inline">45-Day Vaccine Protocol</span>
+            <span className="sm:hidden">Schedule</span>
+          </button>
+
+          <button
+            onClick={handleOpenCreateModal}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold text-white transition-all shadow-md active:scale-95 cursor-pointer ${
+              isLiquid
+                ? 'bg-gradient-to-r from-violet-600 via-cyan-600 to-emerald-500 hover:opacity-90 shadow-violet-500/20'
+                : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            <span>New Batch</span>
+          </button>
+        </div>
       </div>
 
       {/* Search & Status Filters */}
@@ -414,8 +435,18 @@ export default function BatchesPage() {
                     </div>
                   </div>
 
-                  {/* Bottom Action Button */}
-                  <div className="pt-3 border-t border-[var(--border-color)]">
+                  {/* Bottom Action Buttons */}
+                  <div className="pt-3 border-t border-[var(--border-color)] grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        setSelectedBatchForSchedule(batch);
+                        setShowScheduleModal(true);
+                      }}
+                      className="w-full py-2.5 rounded-xl text-xs font-semibold bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] text-emerald-400 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                    >
+                      <Calendar className="w-3.5 h-3.5" />
+                      <span>45-Day Vaccine Plan</span>
+                    </button>
                     <button
                       onClick={() => {
                         setSelectedBatchId(batch.id);
@@ -424,7 +455,7 @@ export default function BatchesPage() {
                       className="w-full py-2.5 rounded-xl text-xs font-semibold bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] border border-[var(--border-color)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Log Daily Telemetry (Mortality / Feed)</span>
+                      <span>Log Daily Telemetry</span>
                     </button>
                   </div>
                 </div>
@@ -693,6 +724,18 @@ export default function BatchesPage() {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* 45-Day Poultry Growth & Vaccination Schedule Modal */}
+      {showScheduleModal && (
+        <Modal
+          isOpen={showScheduleModal}
+          onClose={() => setShowScheduleModal(false)}
+          title={`📅 45-Day Poultry Growth & Vaccination Protocol • ${selectedBatchForSchedule?.batchNumber || 'Active Batch'}`}
+          size="lg"
+        >
+          <FlockCalendar batch={selectedBatchForSchedule || undefined} />
         </Modal>
       )}
     </div>
