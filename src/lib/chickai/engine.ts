@@ -581,11 +581,11 @@ ${score.opportunityNote}`;
     return null;
   }
 
-  private checkActionProposal(query: string, targetBatch: any | null): { text: string; proposal: any } | null {
+  private checkActionProposal(query: string, targetBatch: any | null): { text: string; proposal?: any; clarificationOptions?: any } | null {
     const q = query.toLowerCase();
     const batch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
 
-    // Filter Batches request (e.g. "Show batches with mortality above 4%")
+    // 1. Filter Batches request (e.g. "Show batches with mortality above 4%")
     if (q.includes('show') && (q.includes('batches') || q.includes('batch')) && (q.includes('mortality') || q.includes('growing') || q.includes('profit'))) {
       const mortMatch = query.match(/(\d+(?:\.\d+)?)\s*%/);
       const threshold = mortMatch ? parseFloat(mortMatch[1]) : 4.0;
@@ -605,30 +605,49 @@ ${score.opportunityNote}`;
       };
     }
 
-    // Add Expense Action
-    if ((q.includes('add') || q.includes('record') || q.includes('create') || q.includes('save')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance'))) {
-      const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:rupees|rs|inr))?/i);
-      const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
+    // 2. Create Task Action (e.g. "Create a task to order feed tomorrow", "Remind me to check Batch 45")
+    if (q.includes('task') || q.includes('remind me') || q.includes('todo') || q.includes('procurement')) {
+      const isUrgent = q.includes('urgent') || q.includes('high priority') || q.includes('immediately');
+      let taskTitle = query.replace(/(?:create|add|make|set)?\s*(?:a\s*)?(?:task|reminder|todo)?\s*(?:to|for)?/i, '').trim();
+      if (!taskTitle) taskTitle = 'Farm Inspection & Task';
 
-      let category = 'Miscellaneous';
-      if (q.includes('feed')) category = 'Feed';
-      else if (q.includes('medicine') || q.includes('vaccine')) category = 'Medicine';
-      else if (q.includes('electricity') || q.includes('power')) category = 'Electricity';
-      else if (q.includes('labour') || q.includes('labor') || q.includes('wage') || q.includes('salary')) category = 'Labour';
-      else if (q.includes('maintenance') || q.includes('repair')) category = 'Maintenance';
+      return {
+        text: `I prepared the following operational task:\n\n• **Task:** ${taskTitle}\n• **Priority:** ${isUrgent ? 'High' : 'Medium'}\n• **Assigned Flock:** ${batch ? batch.batchNumber : 'General Farm'}\n• **Deadline:** Suggested 24-48 hours\n\nWould you like me to add this task to your farm dashboard?`,
+        proposal: {
+          type: 'create_task',
+          title: `Create Task: ${taskTitle}`,
+          details: {
+            taskTitle,
+            priority: isUrgent ? 'high' : 'medium',
+            batchId: batch ? batch.id : undefined,
+            batchNumber: batch ? batch.batchNumber : 'General Farm',
+          },
+          status: 'pending',
+        },
+      };
+    }
 
-      if (amount && amount > 0) {
+    // 3. Edit / Update Expense Action (e.g. "Change the ₹1000 feed expense to ₹1200", "Update yesterday's electricity expense to ₹2500")
+    if ((q.includes('change') || q.includes('update') || q.includes('edit') || q.includes('modify')) && (q.includes('expense') || q.includes('feed') || q.includes('electricity') || q.includes('labour') || q.includes('medicine'))) {
+      const amounts = [...query.matchAll(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)/gi)].map((m) => parseFloat(m[1].replace(/,/g, '')));
+      let oldAmount = amounts.length >= 2 ? amounts[0] : null;
+      let newAmount = amounts.length >= 2 ? amounts[1] : (amounts[0] || 1200);
+
+      // Find matching expense in database
+      const matchingExp = this.context.expenses.find((e) => (oldAmount ? e.amount === oldAmount : true) || (q.includes(e.category.toLowerCase()))) || this.context.expenses[0];
+
+      if (matchingExp) {
         return {
-          text: `I prepared the following expense record from your request:\n\n• **Category:** ${category}\n• **Amount:** ₹ ${amount.toLocaleString('en-IN')}\n• **Target Batch:** ${batch ? batch.batchNumber : 'General Farm'}\n• **Description:** Farm management logged via ChickAI Copilot\n\nWould you like me to save this expense to your database?`,
+          text: `I found the expense record to update:\n\n• **Old Amount:** ₹ ${matchingExp.amount.toLocaleString('en-IN')}\n• **New Amount:** **₹ ${newAmount.toLocaleString('en-IN')}**\n• **Category:** ${matchingExp.category}\n• **Description:** ${matchingExp.description}\n\nDo you authorize this modification?`,
           proposal: {
-            type: 'create_expense',
-            title: `Save ₹${amount.toLocaleString('en-IN')} ${category} Expense`,
+            type: 'update_expense',
+            title: `Update Expense to ₹${newAmount.toLocaleString('en-IN')}`,
             details: {
-              category,
-              amount,
-              batchId: batch ? batch.id : undefined,
-              batchNumber: batch ? batch.batchNumber : 'General',
-              description: `ChickAI logged: ${category} expense`,
+              expenseId: matchingExp.id,
+              oldAmount: matchingExp.amount,
+              newAmount,
+              category: matchingExp.category,
+              description: matchingExp.description,
             },
             status: 'pending',
           },
@@ -636,14 +655,117 @@ ${score.opportunityNote}`;
       }
     }
 
-    // Add Mortality Action
+    // 4. Delete Expense Action (e.g. "Delete the ₹1,000 feed expense", "Remove maintenance expense")
+    if ((q.includes('delete') || q.includes('remove') || q.includes('cancel')) && (q.includes('expense') || q.includes('cost'))) {
+      const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)/i);
+      const targetAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
+
+      const matchingExp = this.context.expenses.find((e) => (targetAmount ? e.amount === targetAmount : true) || q.includes(e.category.toLowerCase())) || this.context.expenses[0];
+
+      if (matchingExp) {
+        return {
+          text: `⚠️ **Warning: Delete Expense Record**\n\n• **Amount:** ₹ ${matchingExp.amount.toLocaleString('en-IN')}\n• **Category:** ${matchingExp.category}\n• **Description:** ${matchingExp.description}\n• **Date:** ${new Date(matchingExp.date).toLocaleDateString('en-IN')}\n\n*This action will permanently remove the record from your accounts.*`,
+          proposal: {
+            type: 'delete_expense',
+            title: `Delete ₹${matchingExp.amount.toLocaleString('en-IN')} ${matchingExp.category} Expense`,
+            details: {
+              expenseId: matchingExp.id,
+              amount: matchingExp.amount,
+              category: matchingExp.category,
+              description: matchingExp.description,
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
+    // 5. Add Expense Action & Missing Category Clarification
+    if ((q.includes('add') || q.includes('record') || q.includes('create') || q.includes('save') || q.includes('spent') || q.includes('paid') || q.includes('log') || q.includes('put')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('feed') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance') || q.includes('medicine') || q.includes('transportation'))) {
+      const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:rupees|rs|inr))?/i);
+      const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
+
+      let category: string | null = null;
+      if (q.includes('feed')) category = 'Feed';
+      else if (q.includes('medicine') || q.includes('vaccine')) category = 'Medicine';
+      else if (q.includes('electricity') || q.includes('power')) category = 'Electricity';
+      else if (q.includes('labour') || q.includes('labor') || q.includes('wage') || q.includes('salary')) category = 'Labour';
+      else if (q.includes('maintenance') || q.includes('repair')) category = 'Maintenance';
+      else if (q.includes('chick')) category = 'Chicks';
+      else if (q.includes('transport')) category = 'Transportation';
+
+      // If user provided amount but NO category ("Add 1000 as an expense", "Add ₹1,000 expense")
+      if (amount && amount > 0 && !category && !q.includes('miscellaneous')) {
+        return {
+          text: `I understood you want to record an expense of **₹ ${amount.toLocaleString('en-IN')}**.\n\nWhich category should I assign this to?`,
+          clarificationOptions: {
+            field: 'category',
+            options: ['Feed', 'Medicine', 'Electricity', 'Labour', 'Maintenance', 'Chicks', 'Transportation', 'Other'],
+          },
+        };
+      }
+
+      const finalCategory = category || 'Other';
+      if (amount && amount > 0) {
+        return {
+          text: `I prepared the following expense record:\n\n• **Amount:** **₹ ${amount.toLocaleString('en-IN')}**\n• **Category:** ${finalCategory}\n• **Target Batch:** ${batch ? batch.batchNumber : 'General Farm'}\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n• **Description:** ${finalCategory} expense logged via ChickAI\n\nWould you like me to save this expense to your database?`,
+          proposal: {
+            type: 'create_expense',
+            title: `Save ₹${amount.toLocaleString('en-IN')} ${finalCategory} Expense`,
+            details: {
+              category: finalCategory,
+              amount,
+              batchId: batch ? batch.id : undefined,
+              batchNumber: batch ? batch.batchNumber : 'General Farm',
+              description: `ChickAI logged: ${finalCategory} expense`,
+              date: new Date().toISOString().split('T')[0],
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
+    // 6. Add Feed Usage / Consumption Action (e.g. "Add 500 kg feed usage to Batch 45", "Record 200 kg feed consumed")
+    if ((q.includes('feed usage') || q.includes('feed consumed') || q.includes('kg feed')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
+      const kgMatch = query.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|bags)?/i);
+      const feedKg = kgMatch ? parseFloat(kgMatch[1]) : 200;
+
+      if (batch) {
+        return {
+          text: `I prepared the following feed consumption record:\n\n• **Batch:** ${batch.batchNumber}\n• **Feed Consumed:** **${feedKg} kg** (~${Math.round(feedKg / 50)} bags)\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n\nDo you want me to record this feed consumption?`,
+          proposal: {
+            type: 'add_mortality',
+            title: `Log ${feedKg} kg Feed Usage for ${batch.batchNumber}`,
+            details: {
+              batchId: batch.id,
+              batchNumber: batch.batchNumber,
+              deadChicks: 0,
+              feedConsumed: feedKg,
+              averageWeight: 0,
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
+    // 7. Add Mortality Action
     if ((q.includes('dead') || q.includes('mortality') || q.includes('died')) && (q.includes('add') || q.includes('log') || q.includes('record'))) {
       const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality)?/i);
       const count = countMatch ? parseInt(countMatch[1], 10) : null;
 
       if (count && count > 0 && batch) {
+        const currentAlive = batch.aliveChicks || 4880;
+        const currentDead = batch.deadChicks || 120;
+        const total = batch.totalChicks || 5000;
+        const newAlive = Math.max(0, currentAlive - count);
+        const newDead = currentDead + count;
+        const currentMortPct = ((currentDead / total) * 100).toFixed(2);
+        const newMortPct = ((newDead / total) * 100).toFixed(2);
+
         return {
-          text: `I found the following mortality telemetry log:\n\n• **Batch:** ${batch.batchNumber}\n• **Mortality Count:** ${count} dead birds\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n\nDo you want me to record this daily mortality?`,
+          text: `🐔 **Mortality Update Proposal**\n\n• **Batch:** ${batch.batchNumber}\n• **New Deaths to Log:** **${count} birds**\n• **Current Alive:** ${currentAlive.toLocaleString()} $\\rightarrow$ **${newAlive.toLocaleString()}**\n• **Current Mortality:** ${currentMortPct}% $\\rightarrow$ **${newMortPct}%**\n\nAre you sure you want to record this mortality?`,
           proposal: {
             type: 'add_mortality',
             title: `Log ${count} Mortality for ${batch.batchNumber}`,
@@ -651,7 +773,7 @@ ${score.opportunityNote}`;
               batchId: batch.id,
               batchNumber: batch.batchNumber,
               deadChicks: count,
-              aliveChicks: Math.max(0, batch.aliveChicks - count),
+              aliveChicks: newAlive,
             },
             status: 'pending',
           },
@@ -659,7 +781,7 @@ ${score.opportunityNote}`;
       }
     }
 
-    // Add Sale Action
+    // 8. Add Sale Action
     if ((q.includes('sale') || q.includes('sold')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
       const birdsMatch = query.match(/(\d+)\s*(?:birds|chickens|chicks)/i);
       const rateMatch = query.match(/(?:₹|at|@|rs\.?)\s*(\d+)/i);
@@ -669,7 +791,7 @@ ${score.opportunityNote}`;
       const grossRevenue = Math.round(birdsSold * avgWeight * rate);
 
       return {
-        text: `I prepared the following commercial bird sale receipt:\n\n• **Batch:** ${batch ? batch.batchNumber : 'Active Batch'}\n• **Birds Sold:** ${birdsSold.toLocaleString()} birds\n• **Rate:** ₹ ${rate} / kg (Avg Wt: ${avgWeight} kg)\n• **Gross Total Revenue:** ₹ ${grossRevenue.toLocaleString('en-IN')}\n\nWould you like me to record this bird sale in your database?`,
+        text: `I prepared the following commercial bird sale receipt:\n\n• **Batch:** ${batch ? batch.batchNumber : 'Active Batch'}\n• **Birds Sold:** ${birdsSold.toLocaleString()} birds\n• **Rate:** ₹ ${rate} / kg (Avg Wt: ${avgWeight} kg)\n• **Gross Total Revenue:** **₹ ${grossRevenue.toLocaleString('en-IN')}**\n\nWould you like me to record this bird sale in your database?`,
         proposal: {
           type: 'create_sale',
           title: `Record Sale of ${birdsSold} birds (₹${grossRevenue.toLocaleString('en-IN')})`,

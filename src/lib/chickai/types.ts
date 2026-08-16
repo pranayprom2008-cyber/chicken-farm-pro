@@ -41,32 +41,52 @@ export interface HistoricalBaselines {
   sampleBatchesCount: number;
 }
 
+export interface AIActionHistoryItem {
+  id: string;
+  action: string;
+  target: string;
+  amount?: number;
+  timestamp: string;
+  type: string;
+  status: 'completed' | 'cancelled';
+}
+
+export interface ActionProposal {
+  type: 'create_expense' | 'update_expense' | 'delete_expense' | 'update_batch' | 'add_mortality' | 'create_sale' | 'create_task' | 'filter_batches';
+  title: string;
+  details: {
+    expenseId?: string;
+    category?: string;
+    amount?: number;
+    oldAmount?: number;
+    newAmount?: number;
+    batchNumber?: string;
+    batchId?: string;
+    description?: string;
+    date?: string;
+    deadChicks?: number;
+    aliveChicks?: number;
+    buyer?: string;
+    pricePerKg?: number;
+    chickensSold?: number;
+    taskTitle?: string;
+    priority?: 'low' | 'medium' | 'high';
+    filterKey?: string;
+    filterValue?: any;
+    [key: string]: any;
+  };
+  status: 'pending' | 'confirmed' | 'cancelled';
+}
+
 export interface ChickAIMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   timestamp: string;
-  actionProposal?: {
-    type: 'create_expense' | 'update_batch' | 'add_mortality' | 'create_sale' | 'create_task' | 'filter_batches';
-    title: string;
-    details: {
-      category?: string;
-      amount?: number;
-      batchNumber?: string;
-      batchId?: string;
-      description?: string;
-      deadChicks?: number;
-      aliveChicks?: number;
-      buyer?: string;
-      pricePerKg?: number;
-      chickensSold?: number;
-      taskTitle?: string;
-      priority?: 'low' | 'medium' | 'high';
-      filterKey?: string;
-      filterValue?: any;
-      [key: string]: any;
-    };
-    status: 'pending' | 'confirmed' | 'cancelled';
+  actionProposal?: ActionProposal;
+  clarificationOptions?: {
+    field: 'category' | 'batch';
+    options: string[];
   };
   reportData?: {
     batchNumber: string;

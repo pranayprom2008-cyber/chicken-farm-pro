@@ -200,6 +200,7 @@ interface FarmState {
   createDailyRecord: (data: { batchId: string; deadChicks: number; feedConsumed: number; averageWeight: number; notes?: string }) => Promise<{ success: boolean; error?: string }>;
 
   createExpense: (data: { category: string; amount: number; description: string; date?: string; batchId?: string }) => Promise<{ success: boolean; error?: string }>;
+  updateExpense: (id: string, data: Partial<Expense>) => Promise<{ success: boolean; error?: string }>;
   deleteExpense: (id: string) => Promise<{ success: boolean; error?: string }>;
 
   createBillingCalculation: (data: Partial<BillingRecord>) => Promise<{ success: boolean; error?: string }>;
@@ -789,6 +790,29 @@ export const useFarmStore = create<FarmState>()(
         try {
           fetch('/api/expenses', {
             method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data),
+          });
+        } catch {
+          // ignore
+        }
+
+        return { success: true };
+      },
+
+      updateExpense: async (id, data) => {
+        set((state) => {
+          const updatedExpenses = state.expenses.map((e) => (e.id === id ? { ...e, ...data } : e));
+          const updatedStats = computeStatsFromState(state.batches, updatedExpenses, state.sales);
+          return {
+            expenses: updatedExpenses,
+            stats: updatedStats,
+          };
+        });
+
+        try {
+          fetch(`/api/expenses/${id}`, {
+            method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
           });
