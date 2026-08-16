@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Sparkles,
@@ -34,12 +34,20 @@ import {
   Trash2,
   Edit3,
   Calendar,
-  ListTodo
+  ListTodo,
+  Volume2,
+  VolumeX,
+  Radio,
+  Settings,
+  Square
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFarmStore } from '@/store/useFarmStore';
 import { ChickAIMessage, AIActionHistoryItem, ActionProposal } from '@/lib/chickai/types';
 import { ChickAIEngine } from '@/lib/chickai/engine';
+import { ChickAIVoiceService, VoiceSettings, DEFAULT_VOICE_SETTINGS } from '@/lib/chickai/voice';
+import ChickAIVoiceVisualizer, { VoiceState } from '@/components/ChickAIVoiceVisualizer';
+import ChickAIVoiceSettings from '@/components/ChickAIVoiceSettings';
 import ReactMarkdown from 'react-markdown';
 import WeeklyReportModal from '@/components/WeeklyReportModal';
 
@@ -52,11 +60,38 @@ export default function ChickAI() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showWeeklyModal, setShowWeeklyModal] = useState(false);
   const [showHistoryView, setShowHistoryView] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [activeVoiceMode, setActiveVoiceMode] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [actionHistory, setActionHistory] = useState<AIActionHistoryItem[]>([]);
+
+  // Voice Engine State
+  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('chickai_voice_settings');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return DEFAULT_VOICE_SETTINGS;
+  });
+
+  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
+  const [voiceTranscript, setVoiceTranscript] = useState('');
+  const [pendingVoiceAction, setPendingVoiceAction] = useState<{ msgId: string; proposal: ActionProposal } | null>(null);
+
+  const recognitionRef = useRef<any>(null);
+  const voiceServiceRef = useRef<ChickAIVoiceService>(
+    new ChickAIVoiceService((isSpeaking) => {
+      if (isSpeaking) {
+        setVoiceState('speaking');
+      } else {
+        setVoiceState((prev) => (prev === 'speaking' ? 'idle' : prev));
+      }
+    })
+  );
 
   // Compute live alerts for dynamic button badge
   const engine = new ChickAIEngine({
@@ -102,10 +137,10 @@ export default function ChickAI() {
     }
     return [
       { label: '💰 Add ₹1000 Feed', query: 'Add ₹1,000 for feed' },
+      { label: '☀️ Morning Farm Brief', query: 'What should I focus on today?' },
       { label: '📊 Weekly Excel Report', query: 'Generate weekly audit report for 9849852085 in Excel format' },
       { label: '🏆 Farm AI Score', query: 'Calculate my Farm AI Score' },
       { label: '🧮 What-If Simulator', query: 'What if feed price increases by ₹3/kg?' },
-      { label: '🐔 Analyze Batches', query: 'How are my active batches performing?' },
       { label: '🚨 Find Problems', query: 'Find any problems or alerts on the farm' },
     ];
   };
@@ -143,45 +178,164 @@ export default function ChickAI() {
     }
   }, [isOpen, messages, showHistoryView]);
 
-  // Voice Input Speech Recognition
-  const toggleVoiceInput = () => {
+  // Persist voice settings
+  const handleUpdateVoiceSettings = (newSettings: Partial<VoiceSettings>) => {
+    setVoiceSettings((prev) => {
+      const updated = { ...prev, ...newSettings };
+      if (typeof window !== 'undefined') {
+        try {
+          localStorage.setItem('chickai_voice_settings', JSON.stringify(updated));
+        } catch {}
+      }
+      return updated;
+    });
+  };
+
+  // Stop active speech playback
+  const handleStopSpeech = () => {
+    voiceServiceRef.current.stop();
+    setVoiceState('idle');
+  };
+
+  // Start Speech Recognition Listener
+  const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert('Voice speech recognition is not supported in this browser. Please type your question.');
+      alert('Voice recognition is not supported in this browser. Please type your query.');
       return;
     }
 
-    if (isListening) {
-      setIsListening(false);
-      return;
-    }
+    voiceServiceRef.current.stop();
 
     try {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+      }
+
       const recognition = new SpeechRecognition();
       recognition.continuous = false;
-      recognition.interimResults = false;
+      recognition.interimResults = true;
       recognition.lang = 'en-IN';
 
-      recognition.onstart = () => setIsListening(true);
-      recognition.onend = () => setIsListening(false);
-      recognition.onerror = () => setIsListening(false);
+      recognition.onstart = () => {
+        setVoiceState('listening');
+        setVoiceTranscript('');
+      };
 
       recognition.onresult = (event: any) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript) {
-          setInput(transcript);
-          handleSend(transcript);
+        let interim = '';
+        let finalTranscript = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          } else {
+            interim += event.results[i][0].transcript;
+          }
+        }
+        const text = finalTranscript || interim;
+        setVoiceTranscript(text);
+
+        if (finalTranscript) {
+          handleVoiceInputResult(finalTranscript.trim());
         }
       };
 
+      recognition.onerror = (e: any) => {
+        console.warn('Recognition notice:', e);
+        setVoiceState('idle');
+      };
+
+      recognition.onend = () => {
+        setVoiceState((prev) => (prev === 'listening' ? 'idle' : prev));
+      };
+
+      recognitionRef.current = recognition;
       recognition.start();
-    } catch {
-      setIsListening(false);
+    } catch (err) {
+      console.error(err);
+      setVoiceState('idle');
+    }
+  }, [pendingVoiceAction, voiceSettings]);
+
+  // Handle Voice Input Dispatch & Interruption Parsing
+  const handleVoiceInputResult = async (spokenText: string) => {
+    const clean = spokenText.toLowerCase().trim();
+
+    // 1. Interruption commands
+    if (
+      clean === 'stop' ||
+      clean === 'stop speaking' ||
+      clean === 'cancel' ||
+      clean === 'never mind' ||
+      clean === 'pause' ||
+      clean === 'quiet' ||
+      clean === 'shut up'
+    ) {
+      handleStopSpeech();
+      setVoiceTranscript('');
+      return;
+    }
+
+    // 2. Action Confirmation via Voice
+    if (pendingVoiceAction) {
+      if (
+        clean.includes('yes') ||
+        clean.includes('confirm') ||
+        clean.includes('save') ||
+        clean.includes('do it') ||
+        clean.includes('proceed') ||
+        clean.includes('okay') ||
+        clean.includes('sure')
+      ) {
+        const { msgId, proposal } = pendingVoiceAction;
+        setPendingVoiceAction(null);
+        await handleConfirmAction(msgId, proposal, true);
+        return;
+      }
+      if (
+        clean.includes('no') ||
+        clean.includes('cancel') ||
+        clean.includes("don't") ||
+        clean.includes('reject') ||
+        clean.includes('stop')
+      ) {
+        const { msgId } = pendingVoiceAction;
+        setPendingVoiceAction(null);
+        handleCancelAction(msgId);
+        voiceServiceRef.current.speak('Action cancelled. No database changes were made.', voiceSettings);
+        return;
+      }
+    }
+
+    // 3. Regular Farm Command
+    setVoiceState('thinking');
+    await handleSend(spokenText, true);
+  };
+
+  // Test Voice Persona Button
+  const handleTestVoicePersona = () => {
+    const previewText = "Good evening. Your farm intelligence system is online. Livability is optimal at ninety-seven point six percent. How can I assist with your flocks today?";
+    voiceServiceRef.current.speak(previewText, voiceSettings);
+  };
+
+  // Toggle Voice Mode View
+  const handleToggleVoiceMode = () => {
+    const nextMode = !activeVoiceMode;
+    setActiveVoiceMode(nextMode);
+    if (nextMode) {
+      const greeting = `${getGreeting().replace('✨ ', '')}. Your farm intelligence system is online. How can I help?`;
+      voiceServiceRef.current.speak(greeting, voiceSettings, () => setVoiceState('speaking'), () => {
+        if (voiceSettings.voiceCommands) startListening();
+        else setVoiceState('idle');
+      });
+    } else {
+      handleStopSpeech();
     }
   };
 
-  const handleSend = async (queryText?: string) => {
+  // Master Query Dispatcher
+  const handleSend = async (queryText?: string, isVoiceInitiated = false) => {
     const text = queryText || input;
     if (!text.trim() || loading) return;
 
@@ -195,6 +349,7 @@ export default function ChickAI() {
     setMessages((prev) => [...prev, userMsg]);
     setInput('');
     setLoading(true);
+    setVoiceState('thinking');
 
     try {
       const clientContext = {
@@ -225,16 +380,50 @@ export default function ChickAI() {
           setActiveBatchId(data.lastBatchId);
         }
         setMessages((prev) => [...prev, data.message]);
+
+        // If action proposal returned, store for voice confirmation
+        if (data.message.actionProposal) {
+          setPendingVoiceAction({
+            msgId: data.message.id,
+            proposal: data.message.actionProposal,
+          });
+        } else {
+          setPendingVoiceAction(null);
+        }
+
+        // Auto-Speak Response
+        if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {
+          let spokenText = data.message.text;
+          if (data.message.actionProposal) {
+            spokenText = `I prepared the proposal to ${data.message.actionProposal.title}. Would you like me to save this to your database?`;
+          }
+          await voiceServiceRef.current.speak(
+            spokenText,
+            voiceSettings,
+            () => setVoiceState('speaking'),
+            () => {
+              if (activeVoiceMode && voiceSettings.voiceCommands) {
+                setTimeout(() => startListening(), 300);
+              } else {
+                setVoiceState('idle');
+              }
+            }
+          );
+        } else {
+          setVoiceState('idle');
+        }
       } else {
+        const errorText = data.error || '⚠️ I couldn\'t retrieve your farm data right now. Please try again.';
         setMessages((prev) => [
           ...prev,
           {
             id: `err-${Date.now()}`,
             sender: 'assistant',
-            text: data.error || '⚠️ I couldn\'t retrieve your farm data right now. Please try again.',
+            text: errorText,
             timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           },
         ]);
+        setVoiceState('idle');
       }
     } catch {
       setMessages((prev) => [
@@ -246,21 +435,23 @@ export default function ChickAI() {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
+      setVoiceState('idle');
     } finally {
       setLoading(false);
     }
   };
 
   // Handle Action Confirmations
-  const handleConfirmAction = async (msgId: string, proposal: ActionProposal) => {
+  const handleConfirmAction = async (msgId: string, proposal: ActionProposal, isVoice = false) => {
     try {
       let confirmationText = '';
+      let spokenConfirmation = '';
       const actionTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       // 1. Create Expense
       if (proposal.type === 'create_expense') {
         const { category, amount, batchId, description, batchNumber } = proposal.details;
-        const res = await store.createExpense({
+        await store.createExpense({
           category: category || 'Other',
           amount: amount || 0,
           batchId: batchId || undefined,
@@ -270,6 +461,7 @@ export default function ChickAI() {
 
         const createdId = `EXP-${Date.now().toString().slice(-4)}`;
         confirmationText = `✅ **Expense Added Successfully!**\n\n• **Amount:** ₹ ${amount?.toLocaleString('en-IN')}\n• **Category:** ${category}\n• **Batch:** ${batchNumber || 'General Farm'}\n• **Date:** Today\n• **Expense ID:** #${createdId}\n\n*All dashboard financials and batch totals have been updated live.*`;
+        spokenConfirmation = `Done. I've recorded the ${amount} rupee ${category} expense to your farm database.`;
 
         setActionHistory((prev) => [
           {
@@ -278,31 +470,29 @@ export default function ChickAI() {
             target: batchNumber || 'General Farm',
             amount,
             timestamp: actionTime,
-            type: 'create_expense',
-            status: 'completed',
           },
-          ...prev,
         ]);
       }
       // 2. Update Expense
       else if (proposal.type === 'update_expense') {
-        const { expenseId, oldAmount, newAmount, category, description } = proposal.details;
+        const { expenseId, newAmount, oldAmount, category, description } = proposal.details;
         if (expenseId) {
-          await store.updateExpense(expenseId, { amount: newAmount });
+          await store.updateExpense(expenseId, {
+            amount: newAmount,
+            description: `${description || category} (Updated by ChickAI)`,
+          });
         }
-        confirmationText = `✅ **Expense Updated!** Amount modified from **₹ ${oldAmount?.toLocaleString('en-IN')}** to **₹ ${newAmount?.toLocaleString('en-IN')}** (${category}).`;
+        confirmationText = `✅ **Expense Modified Successfully!**\n\n• **Category:** ${category}\n• **Previous Amount:** ₹ ${oldAmount?.toLocaleString('en-IN')}\n• **Updated Amount:** **₹ ${newAmount?.toLocaleString('en-IN')}**\n\n*Recalculated all batch expenditures and dashboard charts.*`;
+        spokenConfirmation = `Done. The expense has been updated from ${oldAmount} to ${newAmount} rupees.`;
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
-            action: `Updated ${category} Expense to ₹${newAmount?.toLocaleString('en-IN')}`,
-            target: 'Expense Record',
+            action: `Updated ${category} Expense (₹${oldAmount} → ₹${newAmount})`,
+            target: 'Expense Ledger',
             amount: newAmount,
             timestamp: actionTime,
-            type: 'update_expense',
-            status: 'completed',
           },
-          ...prev,
         ]);
       }
       // 3. Delete Expense
@@ -311,58 +501,42 @@ export default function ChickAI() {
         if (expenseId) {
           await store.deleteExpense(expenseId);
         }
-        confirmationText = `✅ **Expense Deleted!** The ₹ ${amount?.toLocaleString('en-IN')} ${category} record was removed from your database.`;
+        confirmationText = `🗑️ **Expense Deleted Successfully.** Removed ₹ ${amount?.toLocaleString('en-IN')} (${category}) from your records.`;
+        spokenConfirmation = `Done. The ${amount} rupee ${category} expense has been deleted.`;
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
             action: `Deleted ₹${amount?.toLocaleString('en-IN')} ${category} Expense`,
-            target: 'Expense Database',
+            target: 'Ledger Cleaned',
             amount,
             timestamp: actionTime,
-            type: 'delete_expense',
-            status: 'completed',
           },
-          ...prev,
         ]);
       }
-      // 4. Add Mortality / Feed Consumption
+      // 4. Add Mortality
       else if (proposal.type === 'add_mortality') {
         const { batchId, deadChicks, feedConsumed, batchNumber } = proposal.details;
-        await store.createDailyRecord({
-          batchId: batchId || store.batches[0]?.id || '',
-          deadChicks: deadChicks || 0,
-          feedConsumed: feedConsumed || 0,
-          averageWeight: 0,
-        });
-
-        if (deadChicks && deadChicks > 0) {
-          confirmationText = `✅ **Mortality Recorded!** Logged **${deadChicks} dead birds** for ${batchNumber || 'Batch'}. Live flock and mortality percentages updated.`;
-          setActionHistory((prev) => [
-            {
-              id: `act-${Date.now()}`,
-              action: `Logged ${deadChicks} Dead Birds`,
-              target: batchNumber || 'Active Batch',
-              timestamp: actionTime,
-              type: 'add_mortality',
-              status: 'completed',
-            },
-            ...prev,
-          ]);
-        } else {
-          confirmationText = `✅ **Feed Usage Recorded!** Logged **${feedConsumed} kg** feed consumption for ${batchNumber || 'Batch'}.`;
-          setActionHistory((prev) => [
-            {
-              id: `act-${Date.now()}`,
-              action: `Recorded ${feedConsumed} kg Feed Consumed`,
-              target: batchNumber || 'Active Batch',
-              timestamp: actionTime,
-              type: 'feed_usage',
-              status: 'completed',
-            },
-            ...prev,
-          ]);
+        if (batchId) {
+          await store.createDailyRecord({
+            batchId,
+            deadChicks: deadChicks || 0,
+            feedConsumed: feedConsumed || 0,
+            averageWeight: 0,
+            notes: 'Logged via ChickAI Voice Copilot',
+          });
         }
+        confirmationText = `✅ **Flock Record Updated!** Recorded **${deadChicks || 0} mortality** and **${feedConsumed || 0} kg feed usage** for **${batchNumber}**.`;
+        spokenConfirmation = `Done. I've updated the mortality telemetry for ${batchNumber}.`;
+
+        setActionHistory((prev) => [
+          {
+            id: `act-${Date.now()}`,
+            action: `Logged ${deadChicks || 0} Dead Birds / ${feedConsumed || 0}kg Feed`,
+            target: batchNumber || 'Active Flock',
+            timestamp: actionTime,
+          },
+        ]);
       }
       // 5. Create Sale
       else if (proposal.type === 'create_sale') {
@@ -376,24 +550,23 @@ export default function ChickAI() {
           saleDate: new Date().toISOString().split('T')[0],
         });
         confirmationText = `✅ **Bird Sale Recorded!** Saved dispatch of **${chickensSold || 500} birds** at ₹${pricePerKg || 115}/kg (Total: ₹ ${(totalRevenue || 0).toLocaleString('en-IN')}).`;
+        spokenConfirmation = `Done. I've recorded the sale of ${chickensSold} birds for a total of ${(totalRevenue || 0)} rupees.`;
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
-            action: `Sold ${chickensSold} Birds (₹${totalRevenue?.toLocaleString('en-IN')})`,
+            action: `Sold ${chickensSold} Birds (₹${(totalRevenue || 0).toLocaleString('en-IN')})`,
             target: batchNumber || 'Commercial Sale',
             amount: totalRevenue,
             timestamp: actionTime,
-            type: 'create_sale',
-            status: 'completed',
           },
-          ...prev,
         ]);
       }
       // 6. Create Task
       else if (proposal.type === 'create_task') {
         const { taskTitle, priority, batchNumber } = proposal.details;
-        confirmationText = `✅ **Farm Task Created!** Task *"${taskTitle}"* (${priority?.toUpperCase()} priority) scheduled for ${batchNumber}.`;
+        confirmationText = `✅ **Operational Task Scheduled!**\n\n• **Task:** ${taskTitle}\n• **Priority:** ${priority?.toUpperCase()}\n• **Target:** ${batchNumber}\n\n*Added to your farm daily agenda.*`;
+        spokenConfirmation = `Done. I've scheduled the task to ${taskTitle}.`;
 
         setActionHistory((prev) => [
           {
@@ -401,134 +574,177 @@ export default function ChickAI() {
             action: `Created Task: ${taskTitle}`,
             target: batchNumber || 'General Farm',
             timestamp: actionTime,
-            type: 'create_task',
-            status: 'completed',
           },
-          ...prev,
         ]);
       }
       // 7. Filter Batches
       else if (proposal.type === 'filter_batches') {
         router.push('/dashboard/batches');
-        confirmationText = `✅ Filter applied to Batches view.`;
+        confirmationText = `🔍 Navigating to Batches view with applied filter.`;
+        spokenConfirmation = `Opening the filtered batches view on your screen.`;
       }
 
+      // Update message state
       setMessages((prev) =>
-        prev.map((m) => {
-          if (m.id === msgId && m.actionProposal) {
-            return {
-              ...m,
-              actionProposal: { ...m.actionProposal, status: 'confirmed' },
-            };
-          }
-          return m;
-        })
+        prev.map((m) =>
+          m.id === msgId && m.actionProposal
+            ? {
+                ...m,
+                actionProposal: {
+                  ...m.actionProposal,
+                  status: 'confirmed',
+                },
+              }
+            : m
+        )
       );
 
+      // Append assistant confirmation message
       setMessages((prev) => [
         ...prev,
         {
           id: `conf-${Date.now()}`,
           sender: 'assistant',
-          text: confirmationText || '✅ Action successfully confirmed and saved.',
+          text: confirmationText,
           timestamp: actionTime,
         },
       ]);
-    } catch (e) {
-      console.error(e);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          sender: 'assistant',
-          text: '❌ I couldn\'t complete that action because the database request failed. Nothing was changed.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+
+      // Speak confirmation if voice mode active or voice-initiated
+      if (voiceSettings.autoSpeak || activeVoiceMode || isVoice) {
+        voiceServiceRef.current.speak(spokenConfirmation, voiceSettings, () => setVoiceState('speaking'), () => {
+          if (activeVoiceMode && voiceSettings.voiceCommands) {
+            setTimeout(() => startListening(), 400);
+          } else {
+            setVoiceState('idle');
+          }
+        });
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert('Failed to execute action: ' + err.message);
     }
   };
 
+  // Handle Cancel Action
   const handleCancelAction = (msgId: string) => {
     setMessages((prev) =>
-      prev.map((m) => {
-        if (m.id === msgId && m.actionProposal) {
-          return {
-            ...m,
-            actionProposal: { ...m.actionProposal, status: 'cancelled' },
-          };
-        }
-        return m;
-      })
+      prev.map((m) =>
+        m.id === msgId && m.actionProposal
+          ? {
+              ...m,
+              actionProposal: {
+                ...m.actionProposal,
+                status: 'cancelled',
+              },
+            }
+          : m
+      )
     );
+    setPendingVoiceAction(null);
   };
 
   return (
     <>
-      {/* Floating ChickAI Launcher Button with Dynamic Badge */}
+      {/* Floating Launcher Button */}
       <div className="fixed bottom-6 right-6 z-40">
         <motion.button
-          whileHover={{ scale: 1.06, y: -2 }}
-          whileTap={{ scale: 0.94 }}
-          onClick={() => setIsOpen((prev) => !prev)}
-          className="relative group flex items-center gap-2.5 px-5 py-3.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 text-white font-black text-sm shadow-2xl shadow-emerald-500/40 border border-emerald-400/40 backdrop-blur-xl cursor-pointer transition-all overflow-hidden"
-          title="Open ChickAI Farm Intelligence Copilot"
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+          onClick={() => setIsOpen(true)}
+          className="relative group p-3.5 sm:px-5 sm:py-3.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-bold text-sm shadow-xl shadow-emerald-700/30 flex items-center gap-2.5 border border-emerald-400/40 backdrop-blur-md cursor-pointer transition-all"
         >
-          <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
-          <span className="relative flex items-center justify-center">
-            <Sparkles className="w-5 h-5 text-amber-300 animate-spin" style={{ animationDuration: '8s' }} />
-          </span>
-          <span className="relative tracking-wide">✨ ChickAI</span>
+          {/* Subtle Ambient Pulse Ring */}
+          <span className="absolute -inset-0.5 rounded-full bg-emerald-400/30 blur-xs group-hover:bg-emerald-400/50 animate-pulse pointer-events-none" />
 
-          {/* Dynamic Alert Notification Badge */}
+          <div className="relative w-6 h-6 flex items-center justify-center">
+            <Bot className="w-5 h-5 text-white animate-bounce [animation-duration:3s]" />
+            <Sparkles className="w-3 h-3 text-amber-300 absolute -top-1 -right-1" />
+          </div>
+
+          <span className="relative tracking-wide font-extrabold hidden sm:inline text-white">
+            ChickAI
+          </span>
+
+          {/* Dynamic Alert Badge */}
           {hasBadge && (
-            <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider flex items-center gap-1 ${
-              criticalCount > 0 ? 'bg-rose-500 text-white animate-pulse' : 'bg-amber-400 text-slate-900'
-            }`}>
-              <span>{criticalCount > 0 ? `🔴 ${criticalCount}` : `🟡 ${attentionCount}`}</span>
+            <span
+              className={`relative px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none ${
+                criticalCount > 0
+                  ? 'bg-rose-500 text-white animate-pulse'
+                  : 'bg-amber-400 text-black'
+              }`}
+            >
+              {criticalCount > 0 ? `🔴 ${criticalCount}` : `🟡 ${attentionCount}`}
             </span>
           )}
         </motion.button>
       </div>
 
-      {/* Floating Glassmorphic AI Panel */}
+      {/* Main Glassmorphism AI Assistant Modal Panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 30, scale: 0.95 }}
-            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
-            className={`fixed bottom-22 right-4 sm:right-6 z-50 rounded-3xl border border-emerald-500/30 bg-[#0B1510]/92 dark:bg-[#060D09]/94 backdrop-blur-2xl shadow-2xl shadow-black/85 flex flex-col overflow-hidden transition-all ${
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 rounded-3xl border border-emerald-500/30 bg-[#09130E]/90 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${
               isExpanded
-                ? 'w-[94vw] sm:w-[740px] h-[86vh]'
-                : 'w-[94vw] sm:w-[490px] h-[650px] max-h-[86vh]'
+                ? 'w-[95vw] sm:w-[720px] h-[90vh] max-h-[850px]'
+                : 'w-[95vw] sm:w-[460px] h-[85vh] max-h-[680px]'
             }`}
           >
+            {/* Ambient Background Aura */}
+            <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
             {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-emerald-500/20 bg-gradient-to-r from-emerald-950/70 to-cyan-950/70 flex items-center justify-between flex-shrink-0">
+            <div className="p-4 sm:p-5 border-b border-emerald-500/20 bg-black/40 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-500 to-cyan-400 p-0.5 shadow-lg shadow-emerald-500/20">
-                  <div className="w-full h-full rounded-[14px] bg-[#0A1610] flex items-center justify-center text-emerald-400">
-                    <Sparkles className="w-5 h-5 text-amber-300 animate-pulse" />
-                  </div>
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                  <Bot className="w-5 h-5" />
                 </div>
                 <div>
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-base font-black text-white tracking-tight flex items-center gap-1.5">
-                      <span>ChickAI</span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 border border-emerald-400/40 text-emerald-300 font-bold uppercase">
-                        Control Copilot
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
+                      ChickAI
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
+                        Voice Copilot
                       </span>
                     </h3>
                   </div>
                   <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
                     <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Connected to Live Farm DB</span>
+                    <span>Live Farm DB • {voiceSettings.voicePersona.replace('-', ' ').toUpperCase()}</span>
                   </div>
                 </div>
               </div>
 
               <div className="flex items-center gap-1 text-slate-400">
+                {/* Voice Mode Toggle */}
+                <button
+                  onClick={handleToggleVoiceMode}
+                  className={`p-1.5 rounded-xl transition-all cursor-pointer ${
+                    activeVoiceMode
+                      ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-md shadow-teal-500/20 animate-pulse'
+                      : 'hover:text-white hover:bg-white/10'
+                  }`}
+                  title={activeVoiceMode ? 'Exit Voice Core Mode' : 'Enter Cinematic Voice Mode'}
+                >
+                  <Radio className="w-4 h-4" />
+                </button>
+
+                {/* Voice Settings Button */}
+                <button
+                  onClick={() => setShowVoiceSettings(true)}
+                  className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  title="Voice Settings & Persona"
+                >
+                  <Volume2 className="w-4 h-4" />
+                </button>
+
+                {/* Action History Button */}
                 <button
                   onClick={() => setShowHistoryView((prev) => !prev)}
                   className={`p-1.5 rounded-xl transition-all cursor-pointer ${
@@ -538,8 +754,11 @@ export default function ChickAI() {
                 >
                   <History className="w-4 h-4" />
                 </button>
+
+                {/* Reset Conversation */}
                 <button
                   onClick={() => {
+                    handleStopSpeech();
                     setActiveBatchId(null);
                     setMessages([
                       {
@@ -555,6 +774,8 @@ export default function ChickAI() {
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
+
+                {/* Expand / Minimize */}
                 <button
                   onClick={() => setIsExpanded((prev) => !prev)}
                   className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
@@ -562,8 +783,13 @@ export default function ChickAI() {
                 >
                   {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                 </button>
+
+                {/* Close Button */}
                 <button
-                  onClick={() => setIsOpen(false)}
+                  onClick={() => {
+                    handleStopSpeech();
+                    setIsOpen(false);
+                  }}
                   className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
                   title="Close AI Assistant"
                 >
@@ -571,6 +797,19 @@ export default function ChickAI() {
                 </button>
               </div>
             </div>
+
+            {/* Cinematic Voice Mode Visualizer Display */}
+            {activeVoiceMode && (
+              <div className="p-4 bg-black/40 border-b border-teal-500/20 flex-shrink-0">
+                <ChickAIVoiceVisualizer
+                  state={voiceState}
+                  onMicClick={voiceState === 'listening' ? () => recognitionRef.current?.stop() : startListening}
+                  onStopSpeech={handleStopSpeech}
+                  transcript={voiceTranscript}
+                  autoSpeak={voiceSettings.autoSpeak}
+                />
+              </div>
+            )}
 
             {/* Contextual Quick Action Suggestion Bar */}
             {!showHistoryView && (
@@ -648,78 +887,74 @@ export default function ChickAI() {
                     <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                       <div className="p-2.5 rounded-2xl bg-black/40 border border-emerald-500/20">
                         <span className="text-[9px] uppercase font-bold text-slate-400 block">Flock Population</span>
-                        <span className="font-extrabold text-emerald-400">{(store.stats?.aliveChicks || 4880).toLocaleString()}</span>
+                        <span className="font-black text-white">{store.stats.aliveChicks.toLocaleString()} birds</span>
                       </div>
                       <div className="p-2.5 rounded-2xl bg-black/40 border border-emerald-500/20">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Feed Runway</span>
-                        <span className="font-extrabold text-amber-400">
-                          {Number(((store.stats?.feedRemaining || 1850) / ((store.stats?.aliveChicks || 4880) * 0.13)).toFixed(1))} Days
-                        </span>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Mortality</span>
+                        <span className="font-black text-emerald-400">{store.stats.mortalityPercentage}%</span>
                       </div>
                       <div className="p-2.5 rounded-2xl bg-black/40 border border-emerald-500/20">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Livability</span>
-                        <span className="font-extrabold text-teal-400">
-                          {(100 - (store.stats?.mortalityPercentage || 2.4)).toFixed(1)}%
-                        </span>
+                        <span className="text-[9px] uppercase font-bold text-slate-400 block">Feed Stock</span>
+                        <span className="font-black text-amber-300">~{store.stats.feedRemaining} kg</span>
                       </div>
                     </div>
 
-                    {/* Top Priorities */}
-                    {criticalCount > 0 && (
-                      <div className="p-2.5 rounded-xl bg-rose-950/30 border border-rose-500/30 text-rose-200 text-[11px] flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
-                        <span>{liveAlerts[0]?.title} - {liveAlerts[0]?.recommendation}</span>
-                      </div>
-                    )}
+                    <div className="flex items-center justify-between pt-1">
+                      <button
+                        onClick={handleToggleVoiceMode}
+                        className="px-3 py-1.5 rounded-xl bg-teal-500/20 hover:bg-teal-500/30 border border-teal-400/40 text-teal-300 font-bold text-[11px] flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Radio className="w-3.5 h-3.5" />
+                        <span>Start Voice Copilot</span>
+                      </button>
+
+                      <span className="text-[10px] text-slate-400 italic">
+                        Voice commands ready
+                      </span>
+                    </div>
                   </div>
                 )}
 
+                {/* Message Stream */}
                 {messages.map((m) => {
                   const isUser = m.sender === 'user';
                   return (
                     <motion.div
                       key={m.id}
-                      initial={{ opacity: 0, y: 10 }}
+                      initial={{ opacity: 0, y: 8 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className={`flex items-start gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
+                      className={`flex gap-2.5 ${isUser ? 'justify-end' : 'justify-start'}`}
                     >
+                      {!isUser && (
+                        <div className="w-7 h-7 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white flex-shrink-0 mt-0.5">
+                          <Bot className="w-4 h-4" />
+                        </div>
+                      )}
+
                       <div
-                        className={`w-7 h-7 rounded-xl flex items-center justify-center flex-shrink-0 text-xs font-bold ${
+                        className={`max-w-[85%] sm:max-w-[78%] rounded-3xl p-3.5 sm:p-4 space-y-2.5 shadow-md ${
                           isUser
-                            ? 'bg-emerald-600 text-white'
-                            : 'bg-cyan-950 border border-cyan-500/40 text-cyan-300'
+                            ? 'bg-emerald-600 text-white rounded-tr-xs'
+                            : 'bg-[#102219]/90 border border-emerald-500/25 text-slate-100 rounded-tl-xs backdrop-blur-md'
                         }`}
                       >
-                        {isUser ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                      </div>
-
-                      <div className="max-w-[85%] space-y-2">
-                        <div
-                          className={`p-3.5 rounded-2xl leading-relaxed whitespace-pre-wrap ${
-                            isUser
-                              ? 'bg-emerald-600 text-white rounded-tr-none font-medium'
-                              : 'bg-[#102219]/90 border border-emerald-500/25 text-emerald-50 rounded-tl-none prose prose-invert prose-xs max-w-none'
-                          }`}
-                        >
-                          {isUser ? (
-                            m.text
-                          ) : (
-                            <div className="space-y-1">
-                              <ReactMarkdown>{m.text}</ReactMarkdown>
-                            </div>
-                          )}
+                        {/* Text Body */}
+                        <div className="prose prose-invert prose-xs max-w-none leading-relaxed break-words font-sans">
+                          <ReactMarkdown>{m.text}</ReactMarkdown>
                         </div>
 
-                        {/* Interactive Category Clarification Chips */}
+                        {/* Clarification Chips if AI is asking for missing slot */}
                         {m.clarificationOptions && (
-                          <div className="p-3 rounded-2xl bg-black/40 border border-cyan-500/30 space-y-2">
-                            <span className="text-[10px] font-bold uppercase text-cyan-300 block">Select Category:</span>
+                          <div className="pt-2 space-y-1.5">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 block">
+                              Select {m.clarificationOptions.field}:
+                            </span>
                             <div className="flex flex-wrap gap-1.5">
-                              {m.clarificationOptions.options.map((opt) => (
+                              {m.clarificationOptions.options.map((opt: string, i: number) => (
                                 <button
-                                  key={opt}
+                                  key={i}
                                   onClick={() => handleSend(`Set category as ${opt}`)}
-                                  className="px-3 py-1.5 rounded-xl bg-cyan-950/60 hover:bg-cyan-900 border border-cyan-500/40 text-cyan-200 font-bold text-[11px] transition-all cursor-pointer active:scale-95"
+                                  className="px-2.5 py-1 rounded-xl bg-teal-950/80 hover:bg-teal-800 border border-teal-400/40 text-teal-200 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
                                 >
                                   {opt}
                                 </button>
@@ -728,114 +963,63 @@ export default function ChickAI() {
                           </div>
                         )}
 
-                        {/* Action Proposal Card */}
+                        {/* Interactive Action Proposal Card */}
                         {m.actionProposal && (
-                          <div
-                            className={`p-4 rounded-2xl border text-xs space-y-3 ${
-                              m.actionProposal.type === 'delete_expense'
-                                ? 'bg-rose-950/40 border-rose-500/40 text-rose-100'
-                                : 'bg-black/50 border-amber-500/40 text-amber-100'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2 font-bold text-xs">
-                                {m.actionProposal.type === 'delete_expense' ? (
-                                  <>
-                                    <Trash2 className="w-4 h-4 text-rose-400" />
-                                    <span className="text-rose-400">Authorization: Delete Record</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <AlertCircle className="w-4 h-4 text-amber-400" />
-                                    <span className="text-amber-400">Database Action Authorization</span>
-                                  </>
-                                )}
-                              </div>
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-white/10 font-mono uppercase">
-                                {m.actionProposal.type.replace('_', ' ')}
+                          <div className="p-3.5 rounded-2xl bg-black/60 border border-emerald-400/40 text-white space-y-3 mt-2 shadow-lg">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                              <span className="font-extrabold text-emerald-400 flex items-center gap-1.5 text-xs">
+                                <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                                {m.actionProposal.title}
+                              </span>
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                                {m.actionProposal.status}
                               </span>
                             </div>
 
-                            {/* Itemized Action Details */}
-                            <div className="p-3 rounded-xl bg-white/5 space-y-1.5 text-[11px]">
-                              {m.actionProposal.details.amount !== undefined && (
+                            {/* Proposal Details Table */}
+                            <div className="text-[11px] space-y-1 text-slate-300 font-mono">
+                              {m.actionProposal.details.amount && (
                                 <div className="flex justify-between">
                                   <span className="text-slate-400">Amount:</span>
-                                  <span className="font-bold text-emerald-400">₹ {m.actionProposal.details.amount.toLocaleString('en-IN')}</span>
+                                  <span className="font-bold text-white">₹ {m.actionProposal.details.amount.toLocaleString('en-IN')}</span>
                                 </div>
                               )}
-                              {m.actionProposal.details.oldAmount !== undefined && (
+                              {m.actionProposal.details.oldAmount && (
                                 <div className="flex justify-between">
                                   <span className="text-slate-400">Old Amount:</span>
                                   <span className="line-through text-slate-400">₹ {m.actionProposal.details.oldAmount.toLocaleString('en-IN')}</span>
                                 </div>
                               )}
-                              {m.actionProposal.details.newAmount !== undefined && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">New Amount:</span>
-                                  <span className="font-bold text-emerald-400">₹ {m.actionProposal.details.newAmount.toLocaleString('en-IN')}</span>
-                                </div>
-                              )}
                               {m.actionProposal.details.category && (
                                 <div className="flex justify-between">
                                   <span className="text-slate-400">Category:</span>
-                                  <span className="font-semibold text-white">{m.actionProposal.details.category}</span>
+                                  <span className="font-bold text-teal-300">{m.actionProposal.details.category}</span>
                                 </div>
                               )}
                               {m.actionProposal.details.batchNumber && (
                                 <div className="flex justify-between">
-                                  <span className="text-slate-400">Target Batch:</span>
-                                  <span className="font-semibold text-white">{m.actionProposal.details.batchNumber}</span>
-                                </div>
-                              )}
-                              {m.actionProposal.details.deadChicks !== undefined && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">New Deaths:</span>
-                                  <span className="font-bold text-rose-400">+{m.actionProposal.details.deadChicks} birds</span>
-                                </div>
-                              )}
-                              {m.actionProposal.details.feedConsumed !== undefined && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Feed Consumed:</span>
-                                  <span className="font-bold text-amber-400">{m.actionProposal.details.feedConsumed} kg</span>
-                                </div>
-                              )}
-                              {m.actionProposal.details.taskTitle && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Task Title:</span>
-                                  <span className="font-semibold text-white">{m.actionProposal.details.taskTitle}</span>
+                                  <span className="text-slate-400">Flock:</span>
+                                  <span className="font-bold text-amber-300">{m.actionProposal.details.batchNumber}</span>
                                 </div>
                               )}
                             </div>
 
-                            {m.actionProposal.status === 'pending' ? (
+                            {/* Confirm / Cancel Buttons */}
+                            {m.actionProposal.status === 'pending' && (
                               <div className="flex items-center gap-2 pt-1">
                                 <button
-                                  onClick={() => handleConfirmAction(m.id, m.actionProposal!)}
-                                  className={`px-4 py-2 rounded-xl text-white font-bold text-xs flex items-center gap-1.5 shadow-md cursor-pointer transition-all ${
-                                    m.actionProposal.type === 'delete_expense'
-                                      ? 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
-                                      : 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30'
-                                  }`}
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                  <span>{m.actionProposal.type === 'delete_expense' ? 'Confirm Delete' : 'Confirm & Save'}</span>
-                                </button>
-                                <button
                                   onClick={() => handleCancelAction(m.id)}
-                                  className="px-3.5 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-semibold text-xs cursor-pointer transition-all"
+                                  className="flex-1 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-[11px] font-bold transition-all cursor-pointer"
                                 >
                                   Cancel
                                 </button>
-                              </div>
-                            ) : m.actionProposal.status === 'confirmed' ? (
-                              <div className="flex items-center gap-1.5 text-emerald-400 font-bold text-[11px]">
-                                <CheckCircle2 className="w-4 h-4" />
-                                <span>Action Executed & Saved to Database</span>
-                              </div>
-                            ) : (
-                              <div className="text-slate-400 italic text-[11px]">
-                                Action Cancelled
+                                <button
+                                  onClick={() => handleConfirmAction(m.id, m.actionProposal!)}
+                                  className="flex-1 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1 transition-all cursor-pointer"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                  <span>Confirm & Save</span>
+                                </button>
                               </div>
                             )}
                           </div>
@@ -878,7 +1062,7 @@ export default function ChickAI() {
                           </div>
                         )}
 
-                        {/* Weekly Report Action Button if message contains weekly audit */}
+                        {/* Weekly Report Action Button */}
                         {m.text.includes('Weekly Farm Executive Audit Report') && (
                           <div className="pt-2">
                             <button
@@ -891,9 +1075,20 @@ export default function ChickAI() {
                           </div>
                         )}
 
-                        <span className="text-[9px] text-slate-400 block px-1">
-                          {m.timestamp}
-                        </span>
+                        {/* Spoken Audio Re-play Button */}
+                        <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1">
+                          <span>{m.timestamp}</span>
+                          {!isUser && (
+                            <button
+                              onClick={() => voiceServiceRef.current.speak(m.text, voiceSettings)}
+                              className="hover:text-teal-300 flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Listen to this response"
+                            >
+                              <Volume2 className="w-3 h-3" />
+                              <span>Speak</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </motion.div>
                   );
@@ -906,7 +1101,7 @@ export default function ChickAI() {
                     className="flex items-center gap-2 p-3 rounded-2xl bg-[#102219]/70 border border-emerald-500/20 text-emerald-300 text-xs w-fit"
                   >
                     <Sparkles className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>ChickAI is analyzing your farm database...</span>
+                    <span>ChickAI Neural Core is computing farm response...</span>
                     <span className="flex gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
@@ -929,15 +1124,15 @@ export default function ChickAI() {
             >
               <button
                 type="button"
-                onClick={toggleVoiceInput}
+                onClick={voiceState === 'listening' ? () => recognitionRef.current?.stop() : startListening}
                 className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  isListening
-                    ? 'bg-rose-500 text-white border-rose-400 animate-pulse'
+                  voiceState === 'listening'
+                    ? 'bg-rose-500 text-white border-rose-400 animate-pulse shadow-lg shadow-rose-500/30'
                     : 'bg-[var(--bg-input)] hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
                 }`}
-                title={isListening ? 'Listening... Click to stop' : 'Click to Speak (Voice Input)'}
+                title={voiceState === 'listening' ? 'Listening... Tap to stop' : 'Click to Speak (Voice Command)'}
               >
-                {isListening ? <Mic className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4" />}
+                {voiceState === 'listening' ? <Mic className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4" />}
               </button>
 
               <input
@@ -945,7 +1140,11 @@ export default function ChickAI() {
                 type="text"
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder={isListening ? 'Listening to your voice...' : 'Ask or command ChickAI (e.g. Add ₹1,000 for feed)...'}
+                placeholder={
+                  voiceState === 'listening'
+                    ? '🔴 Listening to your voice...'
+                    : 'Ask or speak to ChickAI (e.g. Add ₹1,000 for feed)...'
+                }
                 disabled={loading}
                 className="flex-1 px-4 py-2.5 rounded-2xl bg-[var(--bg-input)] border border-emerald-500/30 text-white placeholder-slate-400 text-xs focus:outline-none focus:border-emerald-400 transition-all"
               />
@@ -961,6 +1160,15 @@ export default function ChickAI() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Voice Settings Modal */}
+      <ChickAIVoiceSettings
+        isOpen={showVoiceSettings}
+        onClose={() => setShowVoiceSettings(false)}
+        settings={voiceSettings}
+        onUpdateSettings={handleUpdateVoiceSettings}
+        onTestVoice={handleTestVoicePersona}
+      />
 
       {/* Weekly Report & Excel Dispatch Modal */}
       <WeeklyReportModal

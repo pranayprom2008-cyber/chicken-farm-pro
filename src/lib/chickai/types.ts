@@ -47,8 +47,8 @@ export interface AIActionHistoryItem {
   target: string;
   amount?: number;
   timestamp: string;
-  type: string;
-  status: 'completed' | 'cancelled';
+  type?: string;
+  status?: 'completed' | 'cancelled';
 }
 
 export interface ActionProposal {
