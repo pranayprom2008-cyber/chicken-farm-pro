@@ -67,6 +67,20 @@ export class ChickAIEngine {
   public calculateFarmAIScore(): FarmAIScore {
     const stats = this.context.stats || {};
     const batches = this.context.batches || [];
+
+    if (batches.length === 0) {
+      return {
+        overall: 100,
+        batchHealth: 100,
+        mortalityControl: 100,
+        feedEfficiency: 100,
+        expenseControl: 100,
+        profitability: 100,
+        opportunityNote: 'Fresh database initialized. Place your first flock to activate live biometric scoring.',
+        grade: 'A+',
+      };
+    }
+
     const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
 
     const mortalityPct = stats.mortalityPercentage ?? (activeBatch ? activeBatch.mortalityPercentage : 2.4);

@@ -370,6 +370,39 @@ export default function SettingsPage() {
         </div>
       </div>
 
+      {/* Danger Zone: Reset All to Zero */}
+      <div
+        className="p-6 sm:p-8 rounded-3xl border border-rose-500/30 bg-rose-500/5 space-y-4"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h2 className="text-base font-bold text-rose-400 flex items-center gap-2">
+              <Trash2 className="w-5 h-5" />
+              Reset All Farm Records to Zero
+            </h2>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Permanently clears all batches, expenses, daily logs, sales receipts, and telemetry to start fresh with a clean slate (0).
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={async () => {
+              if (window.confirm('⚠️ ARE YOU SURE?\n\nThis will permanently delete all batches, expenses, sales, and reset the entire farm database to 0 so you can start fresh.')) {
+                const { resetAllData } = useFarmStore.getState();
+                await resetAllData();
+                alert('✅ All farm records have been reset to zero. You are now starting fresh!');
+                router.push('/dashboard');
+              }
+            }}
+            className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-xs font-bold text-white shadow-lg shadow-rose-600/20 transition-all cursor-pointer flex items-center gap-2 shrink-0"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Reset All to Zero</span>
+          </button>
+        </div>
+      </div>
+
       {/* Backup & Restore Modal */}
       <BackupRestoreModal
         isOpen={showBackupModal}

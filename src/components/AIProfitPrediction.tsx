@@ -16,19 +16,19 @@ export default function AIProfitPrediction() {
   const [marketRate, setMarketRate] = useState<number>(118); // Live bird rate ₹/kg
 
   const targetBatch = batches.find((b) => b.id === selectedBatchId) || batches[0];
-  const alive = targetBatch ? targetBatch.aliveChicks : 4880;
+  const alive = targetBatch ? targetBatch.aliveChicks : 0;
   const targetWeightKg = 2.35; // Standard Cobb 500 harvest weight
 
   // Calculations
-  const expectedGrossRevenue = Math.round(alive * targetWeightKg * marketRate);
-  const chickCost = (targetBatch?.totalChicks || 5000) * (targetBatch?.costPerChick || 38);
+  const expectedGrossRevenue = targetBatch ? Math.round(alive * targetWeightKg * marketRate) : 0;
+  const chickCost = targetBatch ? (targetBatch.totalChicks * (targetBatch.costPerChick || 38)) : 0;
   const estFeedKg = alive * 3.8;
   const estFeedCost = Math.round(estFeedKg * 42.5);
   const estMedUtilityCost = Math.round(alive * 12);
 
   const expectedTotalCost = chickCost + estFeedCost + estMedUtilityCost;
   const estimatedNetProfit = expectedGrossRevenue - expectedTotalCost;
-  const profitMargin = ((estimatedNetProfit / expectedGrossRevenue) * 100).toFixed(1);
+  const profitMargin = expectedGrossRevenue > 0 ? ((estimatedNetProfit / expectedGrossRevenue) * 100).toFixed(1) : '0.0';
 
   return (
     <TiltCard maxTilt={4} glare={true}>

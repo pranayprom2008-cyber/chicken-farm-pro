@@ -12,7 +12,7 @@ export default function AIFarmInsights() {
 
   // Build dynamic insights backed strictly by real database data
   const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-  const mortalityPct = stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 2.4);
+  const mortalityPct = stats.totalChicks > 0 ? (stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0)) : 0;
   const feedCost = expenses.filter((e) => e.category === 'Feed').reduce((sum, e) => sum + e.amount, 0);
   const medCost = expenses.filter((e) => e.category === 'Medicine').reduce((sum, e) => sum + e.amount, 0);
   const totalExp = stats.totalExpenditure || expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -26,34 +26,53 @@ export default function AIFarmInsights() {
     metric?: string;
   }[] = [];
 
-  // Insight 1: Mortality Triage
-  if (mortalityPct > 4.5) {
+  if (batches.length === 0) {
     insights.push({
-      id: 'mortality-crit',
-      level: 'critical',
-      title: `${activeBatch?.batchNumber || 'Batch-01'} Mortality Elevated`,
-      description: `Cumulative loss reached ${mortalityPct.toFixed(2)}%. Immediate veterinary inspection and antibiotic/water sanitization recommended.`,
-      icon: <AlertOctagon className="w-5 h-5 text-rose-400" />,
-      metric: `${mortalityPct.toFixed(1)}% Mortality`,
+      id: 'fresh-db',
+      level: 'healthy',
+      title: 'Fresh Database Initialized',
+      description: 'System is clean and ready. Add your first grow-out batch to activate live AI telemetry, FCR tracking, and profit simulation.',
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
+      metric: '0 Active Flocks',
     });
-  } else if (mortalityPct > 2.8) {
     insights.push({
-      id: 'mortality-warn',
-      level: 'attention',
-      title: `${activeBatch?.batchNumber || 'Batch-01'} Mortality Baseline Caution`,
-      description: `Flock loss is slightly above the 2.5% target. Add electrolytes and liver tonic to drinking water.`,
-      icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
-      metric: `${mortalityPct.toFixed(1)}% Mortality`,
+      id: 'bio-ready',
+      level: 'healthy',
+      title: 'Pre-Placement Disinfection Verified',
+      description: 'Ensure drinkers are chlorinated (2 ppm) and chick paper is laid out with pre-starter crumbs before chick arrival.',
+      icon: <Sparkles className="w-5 h-5 text-teal-400" />,
+      metric: 'Bio-Security Ready',
     });
   } else {
-    insights.push({
-      id: 'mortality-good',
-      level: 'healthy',
-      title: 'Flock Livability is Outstanding',
-      description: `Livability is at ${(100 - mortalityPct).toFixed(1)}%, exceeding commercial Cobb 500 standards.`,
-      icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
-      metric: `${(100 - mortalityPct).toFixed(1)}% Livability`,
-    });
+    // Insight 1: Mortality Triage
+    if (mortalityPct > 4.5) {
+      insights.push({
+        id: 'mortality-crit',
+        level: 'critical',
+        title: `${activeBatch?.batchNumber || 'Batch-01'} Mortality Elevated`,
+        description: `Cumulative loss reached ${mortalityPct.toFixed(2)}%. Immediate veterinary inspection and antibiotic/water sanitization recommended.`,
+        icon: <AlertOctagon className="w-5 h-5 text-rose-400" />,
+        metric: `${mortalityPct.toFixed(1)}% Mortality`,
+      });
+    } else if (mortalityPct > 2.8) {
+      insights.push({
+        id: 'mortality-warn',
+        level: 'attention',
+        title: `${activeBatch?.batchNumber || 'Batch-01'} Mortality Baseline Caution`,
+        description: `Flock loss is slightly above the 2.5% target. Add electrolytes and liver tonic to drinking water.`,
+        icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
+        metric: `${mortalityPct.toFixed(1)}% Mortality`,
+      });
+    } else {
+      insights.push({
+        id: 'mortality-good',
+        level: 'healthy',
+        title: 'Flock Livability is Outstanding',
+        description: `Livability is at ${(100 - mortalityPct).toFixed(1)}%, exceeding commercial Cobb 500 standards.`,
+        icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
+        metric: `${(100 - mortalityPct).toFixed(1)}% Livability`,
+      });
+    }
   }
 
   // Insight 2: Feed & Inventory

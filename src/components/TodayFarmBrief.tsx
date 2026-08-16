@@ -16,8 +16,8 @@ export default function TodayFarmBrief() {
   const cautionCount = activeBatches.filter((b) => (b.mortalityPercentage || 0) > 3.0 && (b.mortalityPercentage || 0) <= 4.5).length;
   const criticalCount = activeBatches.filter((b) => (b.mortalityPercentage || 0) > 4.5).length;
 
-  const totalCost = stats.totalExpenditure || 482500;
-  const feedRunwayDays = Number(((stats.feedRemaining || 1850) / ((stats.aliveChicks || 4880) * 0.13)).toFixed(1));
+  const totalCost = stats.totalExpenditure || 0;
+  const feedRunwayDays = stats.aliveChicks > 0 ? Number(((stats.feedRemaining || 0) / (stats.aliveChicks * 0.13)).toFixed(1)) : 0;
   const activeBatch = activeBatches[0] || batches[0];
 
   return (

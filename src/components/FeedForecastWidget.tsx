@@ -11,21 +11,23 @@ export default function FeedForecastWidget() {
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
 
   const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-  const aliveBirds = stats.aliveChicks || (activeBatch ? activeBatch.aliveChicks : 4880);
+  const aliveBirds = stats.totalChicks > 0 ? (stats.aliveChicks || (activeBatch ? activeBatch.aliveChicks : 0)) : 0;
 
   // Daily consumption rate: average ~130g per bird per day for mid-cycle broilers
-  const dailyBurnKg = Math.max(50, Math.round((aliveBirds * 0.13)));
-  const totalStockKg = Math.max(200, stats.feedRemaining || (aliveBirds * 3.5));
+  const dailyBurnKg = aliveBirds > 0 ? Math.round(aliveBirds * 0.13) : 0;
+  const totalStockKg = aliveBirds > 0 ? (stats.feedRemaining || Math.round(aliveBirds * 3.5)) : (stats.feedRemaining || 0);
   const bagsInStock = Math.floor(totalStockKg / 50);
 
   // Calculate days of feed left
-  const daysRemaining = Number((totalStockKg / dailyBurnKg).toFixed(1));
+  const daysRemaining = dailyBurnKg > 0 ? Number((totalStockKg / dailyBurnKg).toFixed(1)) : 0;
 
   let stockStatus: 'safe' | 'reorder' | 'critical' = 'safe';
-  if (daysRemaining < 2.5) stockStatus = 'critical';
-  else if (daysRemaining < 5) stockStatus = 'reorder';
+  if (aliveBirds > 0) {
+    if (daysRemaining < 2.5) stockStatus = 'critical';
+    else if (daysRemaining < 5) stockStatus = 'reorder';
+  }
 
-  const suggestedReorderBags = Math.ceil((aliveBirds * 3.8 - totalStockKg) / 50) || 40;
+  const suggestedReorderBags = aliveBirds > 0 ? Math.max(0, Math.ceil((aliveBirds * 3.8 - totalStockKg) / 50)) : 0;
 
   return (
     <TiltCard maxTilt={5} glare={true}>

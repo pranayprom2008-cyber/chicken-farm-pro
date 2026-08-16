@@ -217,6 +217,7 @@ interface FarmState {
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
   saveSettings: (settings: Partial<FarmSettings>) => Promise<void>;
+  resetAllData: () => Promise<void>;
 }
 
 const defaultStats: DashboardStats = {
@@ -292,7 +293,7 @@ function computeStatsFromState(batches: Batch[], expenses: Expense[], sales: Sal
     aliveChicks,
     deadChicks,
     mortalityPercentage: Number(mortalityPercentage.toFixed(2)),
-    feedConsumed: Math.round(totalChicks * 3.5),
+    feedConsumed: totalChicks > 0 ? Math.round(totalChicks * 3.5) : 0,
     feedRemaining: totalChicks > 0 ? Math.max(0, Math.round(totalChicks * 3.8 - (feedExpenses > 0 ? feedExpenses / 45 : 0))) : 0,
     medicineCost: medExpenses,
     electricityCost: elecExpenses,
@@ -300,7 +301,7 @@ function computeStatsFromState(batches: Batch[], expenses: Expense[], sales: Sal
     maintenanceCost: maintExpenses,
     totalExpenditure,
     totalRevenue,
-    expectedRevenue: aliveChicks * 2.2 * 115,
+    expectedRevenue: totalChicks > 0 ? aliveChicks * 2.2 * 115 : 0,
     estimatedProfit,
     netRealizedProfit: estimatedProfit,
     totalChickensSold,
@@ -316,12 +317,18 @@ function computeStatsFromState(batches: Batch[], expenses: Expense[], sales: Sal
     recentBatches: batches.slice(0, 5),
     recentExpenses: expenses.slice(0, 5),
     recentSales: sales.slice(0, 5),
-    monthlyChartData: [
+    monthlyChartData: totalExpenditure > 0 || totalRevenue > 0 ? [
       { month: 'Oct', expense: Math.round(totalExpenditure * 0.6), revenue: Math.round(totalRevenue * 0.5), profit: Math.round(estimatedProfit * 0.5) },
       { month: 'Nov', expense: Math.round(totalExpenditure * 0.75), revenue: Math.round(totalRevenue * 0.7), profit: Math.round(estimatedProfit * 0.65) },
       { month: 'Dec', expense: Math.round(totalExpenditure * 0.85), revenue: Math.round(totalRevenue * 0.85), profit: Math.round(estimatedProfit * 0.8) },
       { month: 'Jan', expense: Math.round(totalExpenditure * 0.95), revenue: Math.round(totalRevenue * 0.95), profit: Math.round(estimatedProfit * 0.95) },
       { month: 'Feb', expense: totalExpenditure, revenue: totalRevenue, profit: estimatedProfit },
+    ] : [
+      { month: 'Oct', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Nov', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Dec', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Jan', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Feb', expense: 0, revenue: 0, profit: 0 },
     ],
   };
 }
@@ -442,12 +449,8 @@ export const useFarmStore = create<FarmState>()(
           const res = await fetch('/api/batches', { cache: 'no-store' });
           if (res.ok) {
             const serverBatches = await res.json();
-            if (Array.isArray(serverBatches) && serverBatches.length > 0) {
-              // Merge server batches with any newly created local batches
-              const localBatches = get().batches;
-              const serverIds = new Set(serverBatches.map((b: any) => b.id));
-              const nonOverlappingLocal = localBatches.filter((b) => !serverIds.has(b.id));
-              set({ batches: [...serverBatches, ...nonOverlappingLocal] });
+            if (Array.isArray(serverBatches)) {
+              set({ batches: serverBatches });
             }
           }
         } catch {
@@ -460,11 +463,8 @@ export const useFarmStore = create<FarmState>()(
           const res = await fetch('/api/expenses', { cache: 'no-store' });
           if (res.ok) {
             const serverExp = await res.json();
-            if (Array.isArray(serverExp) && serverExp.length > 0) {
-              const localExp = get().expenses;
-              const serverIds = new Set(serverExp.map((e: any) => e.id));
-              const nonOverlapping = localExp.filter((e) => !serverIds.has(e.id));
-              set({ expenses: [...serverExp, ...nonOverlapping] });
+            if (Array.isArray(serverExp)) {
+              set({ expenses: serverExp });
             }
           }
         } catch {
@@ -477,11 +477,8 @@ export const useFarmStore = create<FarmState>()(
           const res = await fetch('/api/billing', { cache: 'no-store' });
           if (res.ok) {
             const serverBilling = await res.json();
-            if (Array.isArray(serverBilling) && serverBilling.length > 0) {
-              const localBilling = get().billingHistory;
-              const serverIds = new Set(serverBilling.map((b: any) => b.id));
-              const nonOverlapping = localBilling.filter((b) => !serverIds.has(b.id));
-              set({ billingHistory: [...serverBilling, ...nonOverlapping] });
+            if (Array.isArray(serverBilling)) {
+              set({ billingHistory: serverBilling });
             }
           }
         } catch {
@@ -494,11 +491,8 @@ export const useFarmStore = create<FarmState>()(
           const res = await fetch('/api/sales', { cache: 'no-store' });
           if (res.ok) {
             const serverSales = await res.json();
-            if (Array.isArray(serverSales) && serverSales.length > 0) {
-              const localSales = get().sales;
-              const serverIds = new Set(serverSales.map((s: any) => s.id));
-              const nonOverlapping = localSales.filter((s) => !serverIds.has(s.id));
-              set({ sales: [...serverSales, ...nonOverlapping] });
+            if (Array.isArray(serverSales)) {
+              set({ sales: serverSales });
             }
           }
         } catch {
@@ -997,6 +991,29 @@ export const useFarmStore = create<FarmState>()(
           });
         } catch {
           // ignore
+        }
+      },
+
+      resetAllData: async () => {
+        set({
+          batches: [],
+          expenses: [],
+          sales: [],
+          billingHistory: [],
+          notifications: [],
+          stats: defaultStats,
+        });
+
+        if (typeof window !== 'undefined') {
+          try {
+            localStorage.removeItem('chickfarm-master-persistence-v3');
+          } catch {}
+        }
+
+        try {
+          await fetch('/api/reset', { method: 'POST' });
+        } catch (e) {
+          console.error(e);
         }
       },
     }),

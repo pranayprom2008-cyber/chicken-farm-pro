@@ -11,16 +11,34 @@ export default function FlockHealthAdvisor() {
   const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
 
-  const mortalityPct = stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 2.4);
-  const totalChicks = stats.totalChicks || (activeBatch ? activeBatch.totalChicks : 5000);
-  const deadChicks = stats.deadChicks || (activeBatch ? activeBatch.deadChicks : 120);
+  const mortalityPct = stats.totalChicks > 0 ? (stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0)) : 0;
+  const totalChicks = stats.totalChicks || (activeBatch ? activeBatch.totalChicks : 0);
+  const deadChicks = stats.deadChicks || (activeBatch ? activeBatch.deadChicks : 0);
 
   // Determine health risk tier
   let statusTier: 'optimal' | 'caution' | 'alert' = 'optimal';
-  if (mortalityPct > 4.5) statusTier = 'alert';
-  else if (mortalityPct > 2.8) statusTier = 'caution';
+  if (totalChicks > 0) {
+    if (mortalityPct > 4.5) statusTier = 'alert';
+    else if (mortalityPct > 2.8) statusTier = 'caution';
+  }
 
   const getAdviceList = () => {
+    if (totalChicks === 0) {
+      return [
+        {
+          title: '🌱 Ready for First Batch Placement',
+          desc: 'Clean, disinfected shed environment detected. Ready to welcome day-old chicks.',
+          action: 'Perform pre-heating (32°C - 34°C) 24 hours prior to chick delivery.',
+          icon: <CheckCircle className="w-4 h-4 text-emerald-400" />,
+        },
+        {
+          title: '💧 Pre-Placement Bio-Security Checklist',
+          desc: 'Ensure chick paper bedding, fresh starter feed trays, and electrolyte water are prepared.',
+          action: 'Test drinker nipple pressure and chlorine residual (2 ppm).',
+          icon: <Droplets className="w-4 h-4 text-teal-400" />,
+        },
+      ];
+    }
     if (statusTier === 'alert') {
       return [
         {
@@ -63,7 +81,7 @@ export default function FlockHealthAdvisor() {
           title: '🌾 Optimum FCR & Growth Curve Active',
           desc: 'Feed consumption trajectory matches standard Cobb 500 growth chart without stress indicators.',
           action: 'Ensure clean drinking water chlorine level (2-3 ppm) is tested daily.',
-          icon: <HeartPulse className="w-4 h-4 text-emerald-400" />,
+          icon: <Sparkles className="w-4 h-4 text-emerald-400" />,
         },
       ];
     }
