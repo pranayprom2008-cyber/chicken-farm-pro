@@ -14,7 +14,7 @@ export interface VoiceSettings {
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
-  voicePersona: 'friendly-assistant',
+  voicePersona: 'friendly-female',
   speed: 1.0,
   volume: 1.0,
   autoSpeak: true,
