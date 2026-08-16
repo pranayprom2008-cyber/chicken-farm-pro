@@ -119,3 +119,59 @@ export interface FarmContextSnapshot {
   settings: any;
   currentPath?: string;
 }
+
+export type ConversationState =
+  | 'IDLE'
+  | 'LISTENING'
+  | 'THINKING'
+  | 'SPEAKING'
+  | 'WAITING_FOR_CONFIRMATION'
+  | 'WAITING_FOR_INFORMATION'
+  | 'EXECUTING_ACTION'
+  | 'ACTION_COMPLETED'
+  | 'CANCELLED'
+  | 'ERROR';
+
+export type UserIntent =
+  | 'STOP_SPEAKING'
+  | 'PAUSE'
+  | 'WAIT'
+  | 'CONTINUE'
+  | 'CONFIRM'
+  | 'CANCEL'
+  | 'REPEAT'
+  | 'CORRECT'
+  | 'SLOW_DOWN'
+  | 'SPEED_UP'
+  | 'QUESTION'
+  | 'FARM_QUERY'
+  | 'DATABASE_ACTION'
+  | 'GENERAL_CONVERSATION'
+  | 'HELP'
+  | 'CHANGE_REQUEST'
+  | 'UNKNOWN';
+
+export interface ConversationContext {
+  state: ConversationState;
+  lastIntent?: UserIntent;
+  lastBatchId?: string | null;
+  lastTopic?: string | null;
+  pendingAction?: ActionProposal | null;
+  waitingForField?: 'category' | 'batch' | 'amount' | null;
+  interruptedMessage?: string | null;
+  lastAssistantResponse?: string | null;
+  speedAdjustment?: number;
+}
+
+export interface ConversationProcessResult {
+  message: ChickAIMessage;
+  nextState: ConversationState;
+  intent: UserIntent;
+  pendingAction?: ActionProposal | null;
+  waitingForField?: 'category' | 'batch' | 'amount' | null;
+  stopAudio?: boolean;
+  resumeAudioText?: string | null;
+  speedAdjustment?: number;
+  lastBatchId?: string | null;
+  handledDirectly?: boolean;
+}

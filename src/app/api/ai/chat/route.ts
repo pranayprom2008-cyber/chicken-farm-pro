@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import prisma from '@/lib/db';
-import { ChickAIEngine } from '@/lib/chickai/engine';
-import { FarmContextSnapshot } from '@/lib/chickai/types';
+import { ChickAIConversationManager } from '@/lib/chickai/conversationManager';
+import { FarmContextSnapshot, ConversationContext } from '@/lib/chickai/types';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { message, history = [], clientContext, lastBatchId } = body;
+    const {
+      message,
+      history = [],
+      clientContext,
+      conversationContext,
+    } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json({ error: 'Message query is required' }, { status: 400 });
@@ -42,7 +47,7 @@ export async function POST(req: NextRequest) {
       // Ephemeral serverless fallback
     }
 
-    // If database returned fewer records than client's active localStorage, prioritize client snapshot
+    // Prioritize client state if DB is empty / offline
     if ((!batches || batches.length === 0) && clientContext?.batches?.length > 0) {
       batches = clientContext.batches;
     }
@@ -66,22 +71,32 @@ export async function POST(req: NextRequest) {
       billingHistory: clientContext?.billingHistory || [],
       stats: stats || clientContext?.stats || {},
       settings: settings || clientContext?.settings || {},
+      currentPath: clientContext?.currentPath,
     };
 
-    const engine = new ChickAIEngine(contextSnapshot);
-    if (lastBatchId) {
-      engine.setLastBatch(lastBatchId);
-    }
+    const convContext: ConversationContext = conversationContext || {
+      state: 'IDLE',
+      lastBatchId: body.lastBatchId || null,
+      pendingAction: null,
+    };
 
-    const responseMessage = engine.processQuery(message, history);
+    const manager = new ChickAIConversationManager(contextSnapshot);
+    const result = manager.process(message, convContext, history);
 
     return NextResponse.json({
       success: true,
-      message: responseMessage,
-      lastBatchId: engine.getLastBatch(),
+      result,
+      message: result.message,
+      nextState: result.nextState,
+      intent: result.intent,
+      pendingAction: result.pendingAction,
+      lastBatchId: result.lastBatchId,
+      stopAudio: result.stopAudio,
+      resumeAudioText: result.resumeAudioText,
+      speedAdjustment: result.speedAdjustment,
     });
   } catch (error: any) {
-    console.error('ChickAI Error:', error);
+    console.error('ChickAI Conversation Error:', error);
     return NextResponse.json(
       {
         success: false,

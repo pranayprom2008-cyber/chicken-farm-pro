@@ -39,14 +39,24 @@ import {
   VolumeX,
   Radio,
   Settings,
-  Square
+  Square,
+  Clock,
+  XCircle,
+  Pause
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFarmStore } from '@/store/useFarmStore';
-import { ChickAIMessage, AIActionHistoryItem, ActionProposal } from '@/lib/chickai/types';
+import {
+  ChickAIMessage,
+  AIActionHistoryItem,
+  ActionProposal,
+  ConversationState,
+  ConversationContext,
+  UserIntent
+} from '@/lib/chickai/types';
 import { ChickAIEngine } from '@/lib/chickai/engine';
 import { ChickAIVoiceService, VoiceSettings, DEFAULT_VOICE_SETTINGS } from '@/lib/chickai/voice';
-import ChickAIVoiceVisualizer, { VoiceState } from '@/components/ChickAIVoiceVisualizer';
+import ChickAIVoiceVisualizer from '@/components/ChickAIVoiceVisualizer';
 import ChickAIVoiceSettings from '@/components/ChickAIVoiceSettings';
 import ReactMarkdown from 'react-markdown';
 import WeeklyReportModal from '@/components/WeeklyReportModal';
@@ -67,6 +77,13 @@ export default function ChickAI() {
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [actionHistory, setActionHistory] = useState<AIActionHistoryItem[]>([]);
 
+  // Conversational State Machine
+  const [conversationState, setConversationState] = useState<ConversationState>('IDLE');
+  const [pendingAction, setPendingAction] = useState<ActionProposal | null>(null);
+  const [waitingForField, setWaitingForField] = useState<'category' | 'batch' | 'amount' | null>(null);
+  const [interruptedMessage, setInterruptedMessage] = useState<string | null>(null);
+  const [lastAssistantResponse, setLastAssistantResponse] = useState<string | null>(null);
+
   // Voice Engine State
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
     if (typeof window !== 'undefined') {
@@ -78,22 +95,19 @@ export default function ChickAI() {
     return DEFAULT_VOICE_SETTINGS;
   });
 
-  const [voiceState, setVoiceState] = useState<VoiceState>('idle');
   const [voiceTranscript, setVoiceTranscript] = useState('');
-  const [pendingVoiceAction, setPendingVoiceAction] = useState<{ msgId: string; proposal: ActionProposal } | null>(null);
-
   const recognitionRef = useRef<any>(null);
   const voiceServiceRef = useRef<ChickAIVoiceService>(
     new ChickAIVoiceService((isSpeaking) => {
       if (isSpeaking) {
-        setVoiceState('speaking');
+        setConversationState('SPEAKING');
       } else {
-        setVoiceState((prev) => (prev === 'speaking' ? 'idle' : prev));
+        setConversationState((prev) => (prev === 'SPEAKING' ? 'IDLE' : prev));
       }
     })
   );
 
-  // Compute live alerts for dynamic button badge
+  // Dynamic Alert Badge Engine
   const engine = new ChickAIEngine({
     batches: store.batches,
     expenses: store.expenses,
@@ -198,13 +212,14 @@ export default function ChickAI() {
     });
   };
 
-  // Stop active speech playback
-  const handleStopSpeech = () => {
+  // Immediate Interruption Handler (Stops audio instantly & preserves state)
+  const handleStopSpeech = useCallback(() => {
     voiceServiceRef.current.stop();
-    setVoiceState('idle');
-  };
+    setConversationState('IDLE');
+    setVoiceTranscript('');
+  }, []);
 
-  // Start Speech Recognition Listener
+  // Continuous / Interactive Speech Recognition with Barge-in
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -213,11 +228,16 @@ export default function ChickAI() {
       return;
     }
 
-    voiceServiceRef.current.stop();
+    // If currently speaking, stop audio immediately upon user speaking
+    if (voiceServiceRef.current.isSpeaking()) {
+      voiceServiceRef.current.stop();
+    }
 
     try {
       if (recognitionRef.current) {
-        recognitionRef.current.abort();
+        try {
+          recognitionRef.current.abort();
+        } catch {}
       }
 
       const recognition = new SpeechRecognition();
@@ -226,7 +246,7 @@ export default function ChickAI() {
       recognition.lang = 'en-IN';
 
       recognition.onstart = () => {
-        setVoiceState('listening');
+        setConversationState('LISTENING');
         setVoiceTranscript('');
       };
 
@@ -243,84 +263,34 @@ export default function ChickAI() {
         const text = finalTranscript || interim;
         setVoiceTranscript(text);
 
+        // Immediate Barge-in: If speaking and any words detected, kill speech immediately!
+        if (voiceServiceRef.current.isSpeaking()) {
+          voiceServiceRef.current.stop();
+        }
+
         if (finalTranscript) {
-          handleVoiceInputResult(finalTranscript.trim());
+          handleProcessTurn(finalTranscript.trim(), true);
         }
       };
 
       recognition.onerror = (e: any) => {
-        console.warn('Recognition notice:', e);
-        setVoiceState('idle');
+        console.warn('Voice notice:', e);
+        setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
       };
 
       recognition.onend = () => {
-        setVoiceState((prev) => (prev === 'listening' ? 'idle' : prev));
+        setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
       console.error(err);
-      setVoiceState('idle');
+      setConversationState('IDLE');
     }
-  }, [pendingVoiceAction, voiceSettings]);
+  }, [pendingAction, voiceSettings, lastAssistantResponse, interruptedMessage]);
 
-  // Handle Voice Input Dispatch & Interruption Parsing
-  const handleVoiceInputResult = async (spokenText: string) => {
-    const clean = spokenText.toLowerCase().trim();
-
-    // 1. Interruption commands
-    if (
-      clean === 'stop' ||
-      clean === 'stop speaking' ||
-      clean === 'cancel' ||
-      clean === 'never mind' ||
-      clean === 'pause' ||
-      clean === 'quiet' ||
-      clean === 'shut up'
-    ) {
-      handleStopSpeech();
-      setVoiceTranscript('');
-      return;
-    }
-
-    // 2. Action Confirmation via Voice
-    if (pendingVoiceAction) {
-      if (
-        clean.includes('yes') ||
-        clean.includes('confirm') ||
-        clean.includes('save') ||
-        clean.includes('do it') ||
-        clean.includes('proceed') ||
-        clean.includes('okay') ||
-        clean.includes('sure')
-      ) {
-        const { msgId, proposal } = pendingVoiceAction;
-        setPendingVoiceAction(null);
-        await handleConfirmAction(msgId, proposal, true);
-        return;
-      }
-      if (
-        clean.includes('no') ||
-        clean.includes('cancel') ||
-        clean.includes("don't") ||
-        clean.includes('reject') ||
-        clean.includes('stop')
-      ) {
-        const { msgId } = pendingVoiceAction;
-        setPendingVoiceAction(null);
-        handleCancelAction(msgId);
-        voiceServiceRef.current.speak('Action cancelled. No database changes were made.', voiceSettings);
-        return;
-      }
-    }
-
-    // 3. Regular Farm Command
-    setVoiceState('thinking');
-    await handleSend(spokenText, true);
-  };
-
-  // Test Voice Persona Button
+  // Test Voice Persona
   const handleTestVoicePersona = () => {
     const previewText = "Hi there! I'm ChickAI, your friendly farm copilot. All your flocks are doing great today. How can I help you?";
     voiceServiceRef.current.speak(previewText, voiceSettings);
@@ -332,129 +302,23 @@ export default function ChickAI() {
     setActiveVoiceMode(nextMode);
     if (nextMode) {
       const greeting = "Hi there! I'm ready to help with your farm. What would you like to check or record?";
-      voiceServiceRef.current.speak(greeting, voiceSettings, () => setVoiceState('speaking'), () => {
+      voiceServiceRef.current.speak(greeting, voiceSettings, () => setConversationState('SPEAKING'), () => {
         if (voiceSettings.voiceCommands) startListening();
-        else setVoiceState('idle');
+        else setConversationState('IDLE');
       });
     } else {
       handleStopSpeech();
     }
   };
 
-  // Master Query Dispatcher
-  const handleSend = async (queryText?: string, isVoiceInitiated = false) => {
-    const text = queryText || input;
-    if (!text.trim() || loading) return;
-
-    const userMsg: ChickAIMessage = {
-      id: `user-${Date.now()}`,
-      sender: 'user',
-      text: text.trim(),
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    setMessages((prev) => [...prev, userMsg]);
-    setInput('');
-    setLoading(true);
-    setVoiceState('thinking');
+  // Execute Confirmed Database Action
+  const executeDatabaseAction = async (proposal: ActionProposal, isVoice = false) => {
+    setConversationState('EXECUTING_ACTION');
+    const actionTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    let confirmationText = '';
+    let spokenConfirmation = '';
 
     try {
-      const clientContext = {
-        batches: store.batches,
-        expenses: store.expenses,
-        sales: store.sales,
-        billingHistory: store.billingHistory,
-        stats: store.stats,
-        settings: store.settings,
-        currentPath: pathname,
-      };
-
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: text.trim(),
-          history: messages,
-          clientContext,
-          lastBatchId: activeBatchId,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success && data.message) {
-        if (data.lastBatchId) {
-          setActiveBatchId(data.lastBatchId);
-        }
-        setMessages((prev) => [...prev, data.message]);
-
-        // If action proposal returned, store for voice confirmation
-        if (data.message.actionProposal) {
-          setPendingVoiceAction({
-            msgId: data.message.id,
-            proposal: data.message.actionProposal,
-          });
-        } else {
-          setPendingVoiceAction(null);
-        }
-
-        // Auto-Speak Response
-        if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {
-          let spokenText = data.message.text;
-          if (data.message.actionProposal) {
-            spokenText = `I prepared the proposal to ${data.message.actionProposal.title}. Would you like me to save this to your database?`;
-          }
-          await voiceServiceRef.current.speak(
-            spokenText,
-            voiceSettings,
-            () => setVoiceState('speaking'),
-            () => {
-              if (activeVoiceMode && voiceSettings.voiceCommands) {
-                setTimeout(() => startListening(), 300);
-              } else {
-                setVoiceState('idle');
-              }
-            }
-          );
-        } else {
-          setVoiceState('idle');
-        }
-      } else {
-        const errorText = data.error || '⚠️ I couldn\'t retrieve your farm data right now. Please try again.';
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `err-${Date.now()}`,
-            sender: 'assistant',
-            text: errorText,
-            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          },
-        ]);
-        setVoiceState('idle');
-      }
-    } catch {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err-${Date.now()}`,
-          sender: 'assistant',
-          text: '⚠️ Network connection issue. Using local telemetry snapshot.',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
-      setVoiceState('idle');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Handle Action Confirmations
-  const handleConfirmAction = async (msgId: string, proposal: ActionProposal, isVoice = false) => {
-    try {
-      let confirmationText = '';
-      let spokenConfirmation = '';
-      const actionTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-
       // 1. Create Expense
       if (proposal.type === 'create_expense') {
         const { category, amount, batchId, description, batchNumber } = proposal.details;
@@ -468,7 +332,7 @@ export default function ChickAI() {
 
         const createdId = `EXP-${Date.now().toString().slice(-4)}`;
         confirmationText = `✅ **Expense Added Successfully!**\n\n• **Amount:** ₹ ${amount?.toLocaleString('en-IN')}\n• **Category:** ${category}\n• **Batch:** ${batchNumber || 'General Farm'}\n• **Date:** Today\n• **Expense ID:** #${createdId}\n\n*All dashboard financials and batch totals have been updated live.*`;
-        spokenConfirmation = `Done. I've recorded the ${amount} rupee ${category} expense to your farm database.`;
+        spokenConfirmation = `Done! I've added the ${amount} rupee ${category} expense for ${batchNumber || 'your farm'}.`;
 
         setActionHistory((prev) => [
           {
@@ -490,7 +354,7 @@ export default function ChickAI() {
           });
         }
         confirmationText = `✅ **Expense Modified Successfully!**\n\n• **Category:** ${category}\n• **Previous Amount:** ₹ ${oldAmount?.toLocaleString('en-IN')}\n• **Updated Amount:** **₹ ${newAmount?.toLocaleString('en-IN')}**\n\n*Recalculated all batch expenditures and dashboard charts.*`;
-        spokenConfirmation = `Done. The expense has been updated from ${oldAmount} to ${newAmount} rupees.`;
+        spokenConfirmation = `Done! The ${category} expense has been updated to ${newAmount} rupees.`;
 
         setActionHistory((prev) => [
           {
@@ -509,7 +373,7 @@ export default function ChickAI() {
           await store.deleteExpense(expenseId);
         }
         confirmationText = `🗑️ **Expense Deleted Successfully.** Removed ₹ ${amount?.toLocaleString('en-IN')} (${category}) from your records.`;
-        spokenConfirmation = `Done. The ${amount} rupee ${category} expense has been deleted.`;
+        spokenConfirmation = `Done! The ${amount} rupee ${category} expense has been deleted.`;
 
         setActionHistory((prev) => [
           {
@@ -521,25 +385,34 @@ export default function ChickAI() {
           },
         ]);
       }
-      // 4. Add Mortality
+      // 4. Add Mortality / Weight Telemetry
       else if (proposal.type === 'add_mortality') {
-        const { batchId, deadChicks, feedConsumed, batchNumber } = proposal.details;
+        const { batchId, deadChicks, feedConsumed, averageWeight, batchNumber } = proposal.details;
         if (batchId) {
           await store.createDailyRecord({
             batchId,
             deadChicks: deadChicks || 0,
             feedConsumed: feedConsumed || 0,
-            averageWeight: 0,
+            averageWeight: averageWeight || 0,
             notes: 'Logged via ChickAI Voice Copilot',
           });
         }
-        confirmationText = `✅ **Flock Record Updated!** Recorded **${deadChicks || 0} mortality** and **${feedConsumed || 0} kg feed usage** for **${batchNumber}**.`;
-        spokenConfirmation = `Done. I've updated the mortality telemetry for ${batchNumber}.`;
+
+        if (averageWeight && averageWeight > 0) {
+          confirmationText = `✅ **Flock Weight Recorded!** Saved **${averageWeight} kg** average bird weight for **${batchNumber}**.`;
+          spokenConfirmation = `Done! I've logged ${averageWeight} kg average weight for ${batchNumber}.`;
+        } else if (deadChicks && deadChicks > 0) {
+          confirmationText = `✅ **Mortality Updated!** Recorded **${deadChicks} dead birds** for **${batchNumber}**.`;
+          spokenConfirmation = `Done! I've updated the mortality record for ${batchNumber}.`;
+        } else {
+          confirmationText = `✅ **Feed Consumed Logged!** Recorded **${feedConsumed} kg feed usage** for **${batchNumber}**.`;
+          spokenConfirmation = `Done! Recorded ${feedConsumed} kilos feed usage for ${batchNumber}.`;
+        }
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
-            action: `Logged ${deadChicks || 0} Dead Birds / ${feedConsumed || 0}kg Feed`,
+            action: `Telemetry Log: ${averageWeight ? `${averageWeight}kg Wt` : `${deadChicks || 0} Dead / ${feedConsumed || 0}kg Feed`}`,
             target: batchNumber || 'Active Flock',
             timestamp: actionTime,
           },
@@ -557,7 +430,7 @@ export default function ChickAI() {
           saleDate: new Date().toISOString().split('T')[0],
         });
         confirmationText = `✅ **Bird Sale Recorded!** Saved dispatch of **${chickensSold || 500} birds** at ₹${pricePerKg || 115}/kg (Total: ₹ ${(totalRevenue || 0).toLocaleString('en-IN')}).`;
-        spokenConfirmation = `Done. I've recorded the sale of ${chickensSold} birds for a total of ${(totalRevenue || 0)} rupees.`;
+        spokenConfirmation = `Done! I've recorded the sale of ${chickensSold} birds for a total of ${(totalRevenue || 0)} rupees.`;
 
         setActionHistory((prev) => [
           {
@@ -573,7 +446,7 @@ export default function ChickAI() {
       else if (proposal.type === 'create_task') {
         const { taskTitle, priority, batchNumber } = proposal.details;
         confirmationText = `✅ **Operational Task Scheduled!**\n\n• **Task:** ${taskTitle}\n• **Priority:** ${priority?.toUpperCase()}\n• **Target:** ${batchNumber}\n\n*Added to your farm daily agenda.*`;
-        spokenConfirmation = `Done. I've scheduled the task to ${taskTitle}.`;
+        spokenConfirmation = `Done! I've scheduled the task to ${taskTitle}.`;
 
         setActionHistory((prev) => [
           {
@@ -584,72 +457,269 @@ export default function ChickAI() {
           },
         ]);
       }
-      // 7. Filter Batches
-      else if (proposal.type === 'filter_batches') {
-        router.push('/dashboard/batches');
-        confirmationText = `🔍 Navigating to Batches view with applied filter.`;
-        spokenConfirmation = `Opening the filtered batches view on your screen.`;
-      }
 
-      // Update message state
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === msgId && m.actionProposal
-            ? {
-                ...m,
-                actionProposal: {
-                  ...m.actionProposal,
-                  status: 'confirmed',
-                },
-              }
-            : m
-        )
-      );
+      setPendingAction(null);
+      setConversationState('ACTION_COMPLETED');
 
       // Append assistant confirmation message
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `conf-${Date.now()}`,
-          sender: 'assistant',
-          text: confirmationText,
-          timestamp: actionTime,
-        },
-      ]);
+      const confMsg: ChickAIMessage = {
+        id: `conf-${Date.now()}`,
+        sender: 'assistant',
+        text: confirmationText,
+        timestamp: actionTime,
+      };
+      setMessages((prev) => [...prev, confMsg]);
+      setLastAssistantResponse(confirmationText);
 
-      // Speak confirmation if voice mode active or voice-initiated
+      // Speak confirmation if voice is active
       if (voiceSettings.autoSpeak || activeVoiceMode || isVoice) {
-        voiceServiceRef.current.speak(spokenConfirmation, voiceSettings, () => setVoiceState('speaking'), () => {
+        voiceServiceRef.current.speak(spokenConfirmation, voiceSettings, () => setConversationState('SPEAKING'), () => {
           if (activeVoiceMode && voiceSettings.voiceCommands) {
             setTimeout(() => startListening(), 400);
           } else {
-            setVoiceState('idle');
+            setConversationState('IDLE');
           }
         });
       }
     } catch (err: any) {
       console.error(err);
+      setConversationState('ERROR');
       alert('Failed to execute action: ' + err.message);
     }
   };
 
-  // Handle Cancel Action
-  const handleCancelAction = (msgId: string) => {
-    setMessages((prev) =>
-      prev.map((m) =>
-        m.id === msgId && m.actionProposal
-          ? {
-              ...m,
-              actionProposal: {
-                ...m.actionProposal,
-                status: 'cancelled',
-              },
+  // Master Conversational Turn Processor
+  const handleProcessTurn = async (queryText?: string, isVoiceInitiated = false) => {
+    const text = (queryText || input).trim();
+    if (!text || loading) return;
+
+    const qLower = text.toLowerCase().trim();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // ==========================================================
+    // CLIENT FAST-PATH 1: STOP / INTERRUPTION COMMANDS
+    // ==========================================================
+    if (
+      qLower === 'stop' ||
+      qLower === 'stop speaking' ||
+      qLower === 'stop talking' ||
+      qLower === 'be quiet' ||
+      qLower === 'shut up' ||
+      qLower === 'pause' ||
+      qLower === "that's enough" ||
+      qLower === 'thats enough' ||
+      qLower === 'quiet' ||
+      qLower === 'mute'
+    ) {
+      handleStopSpeech();
+      setInput('');
+      // Store current response as interrupted message so user can say "Continue"
+      if (lastAssistantResponse) {
+        setInterruptedMessage(lastAssistantResponse);
+      }
+      return;
+    }
+
+    // ==========================================================
+    // CLIENT FAST-PATH 2: CONFIRMATION (YES)
+    // ==========================================================
+    const isYes = [
+      'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'okay', 'ok',
+      'proceed', 'sure', 'save', 'please do', 'yes please', 'yes save it', 'yes do it'
+    ].some((p) => qLower === p || qLower.startsWith(`${p} `) || qLower.endsWith(` ${p}`));
+
+    if (isYes && pendingAction) {
+      setInput('');
+      const userMsg: ChickAIMessage = {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text,
+        timestamp: timeStr,
+      };
+      setMessages((prev) => [...prev, userMsg]);
+      await executeDatabaseAction(pendingAction, isVoiceInitiated);
+      return;
+    }
+
+    // ==========================================================
+    // CLIENT FAST-PATH 3: CANCELLATION (NO)
+    // ==========================================================
+    const isNo = [
+      'no', 'nope', 'cancel', "don't", 'dont', 'never mind', 'nevermind', "don't do that",
+      'forget it', "don't save", 'reject', 'abort', "no don't", 'actually no'
+    ].some((p) => qLower === p || qLower.startsWith(`${p} `) || qLower.endsWith(` ${p}`));
+
+    if (isNo && (pendingAction || conversationState === 'WAITING_FOR_CONFIRMATION' || conversationState === 'WAITING_FOR_INFORMATION')) {
+      setInput('');
+      setPendingAction(null);
+      setWaitingForField(null);
+      setConversationState('CANCELLED');
+
+      const userMsg: ChickAIMessage = {
+        id: `user-${Date.now()}`,
+        sender: 'user',
+        text,
+        timestamp: timeStr,
+      };
+      const cancelMsg: ChickAIMessage = {
+        id: `cancel-${Date.now()}`,
+        sender: 'assistant',
+        text: '↩️ *Okay, I\'ve cancelled that.* No changes were made to your farm database.',
+        timestamp: timeStr,
+      };
+
+      setMessages((prev) => [...prev, userMsg, cancelMsg]);
+      setLastAssistantResponse(cancelMsg.text);
+
+      if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {
+        voiceServiceRef.current.speak('Okay, I cancelled that.', voiceSettings, () => setConversationState('SPEAKING'), () => {
+          setConversationState('IDLE');
+        });
+      }
+      return;
+    }
+
+    // ==========================================================
+    // STANDARD / BACKEND CONVERSATION ENGINE DISPATCH
+    // ==========================================================
+    const userMsg: ChickAIMessage = {
+      id: `user-${Date.now()}`,
+      sender: 'user',
+      text,
+      timestamp: timeStr,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+    setConversationState('THINKING');
+
+    try {
+      const convContext: ConversationContext = {
+        state: conversationState,
+        lastBatchId: activeBatchId,
+        pendingAction,
+        waitingForField,
+        interruptedMessage,
+        lastAssistantResponse,
+      };
+
+      const clientContext = {
+        batches: store.batches,
+        expenses: store.expenses,
+        sales: store.sales,
+        billingHistory: store.billingHistory,
+        stats: store.stats,
+        settings: store.settings,
+        currentPath: pathname,
+      };
+
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: text,
+          history: messages,
+          clientContext,
+          conversationContext: convContext,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success && data.message) {
+        if (data.lastBatchId) {
+          setActiveBatchId(data.lastBatchId);
+        }
+
+        setConversationState(data.nextState || 'IDLE');
+        setPendingAction(data.pendingAction || null);
+        setLastAssistantResponse(data.message.text);
+
+        if (data.speedAdjustment) {
+          handleUpdateVoiceSettings({
+            speed: Math.max(0.8, Math.min(1.2, (voiceSettings.speed || 1.0) + data.speedAdjustment)),
+          });
+        }
+
+        setMessages((prev) => [...prev, data.message]);
+
+        // Auto-Speak if enabled or in voice mode
+        if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {
+          let spokenText = data.resumeAudioText || data.message.text;
+          if (data.message.actionProposal && data.message.actionProposal.status === 'pending') {
+            spokenText = `I prepared the proposal for ${data.message.actionProposal.title}. Would you like me to save this to your database?`;
+          }
+
+          await voiceServiceRef.current.speak(
+            spokenText,
+            voiceSettings,
+            () => setConversationState('SPEAKING'),
+            () => {
+              if (activeVoiceMode && voiceSettings.voiceCommands) {
+                setTimeout(() => startListening(), 350);
+              } else {
+                setConversationState(data.nextState || 'IDLE');
+              }
             }
-          : m
-      )
-    );
-    setPendingVoiceAction(null);
+          );
+        } else {
+          setConversationState(data.nextState || 'IDLE');
+        }
+      } else {
+        const errorText = data.error || '⚠️ I couldn\'t retrieve your farm data right now. Please try again.';
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `err-${Date.now()}`,
+            sender: 'assistant',
+            text: errorText,
+            timestamp: timeStr,
+          },
+        ]);
+        setConversationState('ERROR');
+      }
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: 'assistant',
+          text: '⚠️ Network connection issue. Telemetry snapshot active.',
+          timestamp: timeStr,
+        },
+      ]);
+      setConversationState('ERROR');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  // Get status pill text & color for Header
+  const getHeaderStatusIndicator = () => {
+    switch (conversationState) {
+      case 'LISTENING':
+        return { text: '🎙 Listening...', color: 'text-rose-400 bg-rose-950/60 border-rose-500/30 animate-pulse' };
+      case 'THINKING':
+      case 'EXECUTING_ACTION':
+        return { text: '🧠 Thinking...', color: 'text-amber-400 bg-amber-950/60 border-amber-500/30' };
+      case 'SPEAKING':
+        return { text: '🔊 Speaking...', color: 'text-emerald-400 bg-emerald-950/60 border-emerald-500/30' };
+      case 'WAITING_FOR_CONFIRMATION':
+        return { text: '⏳ Waiting for confirmation', color: 'text-cyan-300 bg-cyan-950/60 border-cyan-400/30' };
+      case 'WAITING_FOR_INFORMATION':
+        return { text: '❓ Waiting for details', color: 'text-amber-300 bg-amber-950/60 border-amber-400/30' };
+      case 'ACTION_COMPLETED':
+        return { text: '✓ Done', color: 'text-green-400 bg-green-950/60 border-green-500/30' };
+      case 'CANCELLED':
+        return { text: '↩ Cancelled', color: 'text-slate-400 bg-slate-900/60 border-slate-700/30' };
+      case 'IDLE':
+      default:
+        return { text: '● Ready', color: 'text-emerald-400 bg-emerald-950/40 border-emerald-500/20' };
+    }
+  };
+
+  const statusIndicator = getHeaderStatusIndicator();
 
   return (
     <>
@@ -717,13 +787,15 @@ export default function ChickAI() {
                     <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
                       ChickAI
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
-                        Voice Copilot
+                        Copilot
                       </span>
                     </h3>
                   </div>
-                  <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                    <span>Live Farm DB • {voiceSettings.voicePersona.replace('-', ' ').toUpperCase()}</span>
+                  {/* Real Conversational State Badge */}
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold ${statusIndicator.color}`}>
+                      {statusIndicator.text}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -737,7 +809,7 @@ export default function ChickAI() {
                       ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-md shadow-teal-500/20 animate-pulse'
                       : 'hover:text-white hover:bg-white/10'
                   }`}
-                  title={activeVoiceMode ? 'Exit Voice Core Mode' : 'Enter Cinematic Voice Mode'}
+                  title={activeVoiceMode ? 'Exit Voice Core Mode' : 'Enter Conversational Voice Mode'}
                 >
                   <Radio className="w-4 h-4" />
                 </button>
@@ -767,6 +839,8 @@ export default function ChickAI() {
                   onClick={() => {
                     handleStopSpeech();
                     setActiveBatchId(null);
+                    setPendingAction(null);
+                    setConversationState('IDLE');
                     setMessages([
                       {
                         id: 'welcome',
@@ -809,8 +883,8 @@ export default function ChickAI() {
             {activeVoiceMode && (
               <div className="p-4 bg-black/40 border-b border-teal-500/20 flex-shrink-0">
                 <ChickAIVoiceVisualizer
-                  state={voiceState}
-                  onMicClick={voiceState === 'listening' ? () => recognitionRef.current?.stop() : startListening}
+                  state={conversationState}
+                  onMicClick={conversationState === 'LISTENING' ? () => recognitionRef.current?.stop() : startListening}
                   onStopSpeech={handleStopSpeech}
                   transcript={voiceTranscript}
                   autoSpeak={voiceSettings.autoSpeak}
@@ -824,7 +898,7 @@ export default function ChickAI() {
                 {currentPrompts.map((p, idx) => (
                   <button
                     key={idx}
-                    onClick={() => handleSend(p.query)}
+                    onClick={() => handleProcessTurn(p.query)}
                     className="px-3 py-1.5 rounded-full bg-emerald-950/50 hover:bg-emerald-900/70 border border-emerald-500/30 text-emerald-300 text-[11px] font-bold whitespace-nowrap transition-all active:scale-95 cursor-pointer flex-shrink-0"
                   >
                     {p.label}
@@ -916,7 +990,7 @@ export default function ChickAI() {
                       </button>
 
                       <span className="text-[10px] text-slate-400 italic">
-                        Voice commands ready
+                        Real conversational AI active
                       </span>
                     </div>
                   </div>
@@ -960,7 +1034,7 @@ export default function ChickAI() {
                               {m.clarificationOptions.options.map((opt: string, i: number) => (
                                 <button
                                   key={i}
-                                  onClick={() => handleSend(`Set category as ${opt}`)}
+                                  onClick={() => handleProcessTurn(`Set category as ${opt}`)}
                                   className="px-2.5 py-1 rounded-xl bg-teal-950/80 hover:bg-teal-800 border border-teal-400/40 text-teal-200 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
                                 >
                                   {opt}
@@ -1015,13 +1089,13 @@ export default function ChickAI() {
                             {m.actionProposal.status === 'pending' && (
                               <div className="flex items-center gap-2 pt-1">
                                 <button
-                                  onClick={() => handleCancelAction(m.id)}
+                                  onClick={() => handleProcessTurn('cancel')}
                                   className="flex-1 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 text-[11px] font-bold transition-all cursor-pointer"
                                 >
                                   Cancel
                                 </button>
                                 <button
-                                  onClick={() => handleConfirmAction(m.id, m.actionProposal!)}
+                                  onClick={() => executeDatabaseAction(m.actionProposal!)}
                                   className="flex-1 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold shadow-md shadow-emerald-600/30 flex items-center justify-center gap-1 transition-all cursor-pointer"
                                 >
                                   <Check className="w-3.5 h-3.5" />
@@ -1082,18 +1156,31 @@ export default function ChickAI() {
                           </div>
                         )}
 
-                        {/* Spoken Audio Re-play Button */}
+                        {/* Spoken Audio Re-play / Stop Button */}
                         <div className="flex items-center justify-between text-[9px] text-slate-400 pt-1">
                           <span>{m.timestamp}</span>
                           {!isUser && (
-                            <button
-                              onClick={() => voiceServiceRef.current.speak(m.text, voiceSettings)}
-                              className="hover:text-teal-300 flex items-center gap-1 transition-colors cursor-pointer"
-                              title="Listen to this response"
-                            >
-                              <Volume2 className="w-3 h-3" />
-                              <span>Speak</span>
-                            </button>
+                            <div className="flex items-center gap-2">
+                              {conversationState === 'SPEAKING' ? (
+                                <button
+                                  onClick={handleStopSpeech}
+                                  className="text-rose-400 hover:text-rose-300 flex items-center gap-1 transition-colors cursor-pointer font-bold"
+                                  title="Stop speaking"
+                                >
+                                  <Square className="w-3 h-3 fill-rose-400" />
+                                  <span>Stop</span>
+                                </button>
+                              ) : (
+                                <button
+                                  onClick={() => voiceServiceRef.current.speak(m.text, voiceSettings)}
+                                  className="hover:text-teal-300 flex items-center gap-1 transition-colors cursor-pointer"
+                                  title="Listen to this response"
+                                >
+                                  <Volume2 className="w-3 h-3" />
+                                  <span>Speak</span>
+                                </button>
+                              )}
+                            </div>
                           )}
                         </div>
                       </div>
@@ -1108,7 +1195,7 @@ export default function ChickAI() {
                     className="flex items-center gap-2 p-3 rounded-2xl bg-[#102219]/70 border border-emerald-500/20 text-emerald-300 text-xs w-fit"
                   >
                     <Sparkles className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>ChickAI Neural Core is computing farm response...</span>
+                    <span>ChickAI is processing farm response...</span>
                     <span className="flex gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
@@ -1121,26 +1208,38 @@ export default function ChickAI() {
               </div>
             )}
 
-            {/* Input Bar with Voice Recognition Mic */}
+            {/* Input Bar with Voice Recognition Mic & State-Responsive Controls */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                handleSend();
+                handleProcessTurn();
               }}
               className="p-3.5 border-t border-emerald-500/20 bg-black/45 flex items-center gap-2 flex-shrink-0"
             >
-              <button
-                type="button"
-                onClick={voiceState === 'listening' ? () => recognitionRef.current?.stop() : startListening}
-                className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-                  voiceState === 'listening'
-                    ? 'bg-rose-500 text-white border-rose-400 animate-pulse shadow-lg shadow-rose-500/30'
-                    : 'bg-[var(--bg-input)] hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
-                }`}
-                title={voiceState === 'listening' ? 'Listening... Tap to stop' : 'Click to Speak (Voice Command)'}
-              >
-                {voiceState === 'listening' ? <Mic className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4" />}
-              </button>
+              {conversationState === 'SPEAKING' ? (
+                <button
+                  type="button"
+                  onClick={handleStopSpeech}
+                  className="p-2.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white border border-rose-400/50 shadow-lg shadow-rose-600/30 transition-all cursor-pointer flex items-center gap-1 font-bold text-xs"
+                  title="Stop speaking"
+                >
+                  <Square className="w-4 h-4 fill-white" />
+                  <span className="hidden sm:inline">Stop</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={conversationState === 'LISTENING' ? () => recognitionRef.current?.stop() : startListening}
+                  className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
+                    conversationState === 'LISTENING'
+                      ? 'bg-rose-500 text-white border-rose-400 animate-pulse shadow-lg shadow-rose-500/30'
+                      : 'bg-[var(--bg-input)] hover:bg-emerald-500/20 border-emerald-500/30 text-emerald-400'
+                  }`}
+                  title={conversationState === 'LISTENING' ? 'Listening... Tap to stop' : 'Click to Speak (Voice Command)'}
+                >
+                  {conversationState === 'LISTENING' ? <Mic className="w-4 h-4 text-white" /> : <Mic className="w-4 h-4" />}
+                </button>
+              )}
 
               <input
                 ref={inputRef}
@@ -1148,8 +1247,10 @@ export default function ChickAI() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 placeholder={
-                  voiceState === 'listening'
+                  conversationState === 'LISTENING'
                     ? '🔴 Listening to your voice...'
+                    : conversationState === 'WAITING_FOR_CONFIRMATION'
+                    ? 'Say "Yes" to confirm or "Cancel" to discard...'
                     : 'Ask or speak to ChickAI (e.g. Add ₹1,000 for feed)...'
                 }
                 disabled={loading}
