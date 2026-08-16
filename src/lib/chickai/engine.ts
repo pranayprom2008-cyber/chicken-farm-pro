@@ -5,6 +5,7 @@ import {
   WhatIfSimulationResult,
   ProactiveAlert,
   HistoricalBaselines,
+  ActionProposal,
 } from './types';
 
 export class ChickAIEngine {
@@ -70,31 +71,26 @@ export class ChickAIEngine {
 
     const mortalityPct = stats.mortalityPercentage ?? (activeBatch ? activeBatch.mortalityPercentage : 2.4);
 
-    // 1. Mortality Score (Ideal <= 2.5% = 95-100, 2.5-4% = 80-94, >4% = 60-79)
     let mortalityControl = 94;
     if (mortalityPct <= 2.0) mortalityControl = 98;
     else if (mortalityPct <= 3.0) mortalityControl = 90;
     else if (mortalityPct <= 4.0) mortalityControl = 82;
     else mortalityControl = Math.max(50, Math.round(100 - mortalityPct * 9));
 
-    // 2. Batch Health Score
     let batchHealth = 92;
     const criticalBatches = batches.filter((b) => (b.mortalityPercentage || 0) > 4.5).length;
     if (criticalBatches > 0) batchHealth -= criticalBatches * 15;
     batchHealth = Math.max(55, Math.min(99, batchHealth));
 
-    // 3. Feed Efficiency (FCR Baseline 1.55-1.60)
     const feedRunwayDays = Number(((stats.feedRemaining || 1850) / ((stats.aliveChicks || 4880) * 0.13)).toFixed(1));
     let feedEfficiency = 88;
     if (feedRunwayDays < 3.0) feedEfficiency -= 12;
 
-    // 4. Expense Control
     const totalExp = stats.totalExpenditure || 482500;
     const totalRev = stats.totalRevenue || 0;
     let expenseControl = 90;
     if (totalExp > 800000 && totalRev === 0) expenseControl = 84;
 
-    // 5. Profitability Score
     let profitability = 89;
     const netProfit = stats.netRealizedProfit || (totalRev - totalExp);
     if (netProfit > 100000) profitability = 96;
@@ -145,7 +141,6 @@ export class ChickAIEngine {
     const stats = this.context.stats || {};
     const baselines = this.calculateHistoricalBaselines();
 
-    // Check active batches for mortality spikes
     batches.forEach((b) => {
       const mort = b.mortalityPercentage || 0;
       if (mort > 4.2) {
@@ -175,7 +170,6 @@ export class ChickAIEngine {
       }
     });
 
-    // Check Feed Runway
     const alive = stats.aliveChicks || 4880;
     const feedRemaining = stats.feedRemaining || 1850;
     const feedRunwayDays = Number((feedRemaining / (alive * 0.13)).toFixed(1));
@@ -215,11 +209,10 @@ export class ChickAIEngine {
     const activeBatch = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
     const alive = activeBatch ? activeBatch.aliveChicks : 4880;
     const targetWeight = 2.35;
-    const baseSellingRate = 118; // ₹/kg
-    const baseFeedCostPerKg = 42.5; // ₹/kg
+    const baseSellingRate = 118;
+    const baseFeedCostPerKg = 42.5;
     const totalFeedKg = alive * 3.8;
 
-    // Baseline calculation
     const baseGrossRev = Math.round(alive * targetWeight * baseSellingRate);
     const baseChickCost = (activeBatch?.totalChicks || 5000) * (activeBatch?.costPerChick || 38);
     const baseFeedCost = Math.round(totalFeedKg * baseFeedCostPerKg);
@@ -232,7 +225,6 @@ export class ChickAIEngine {
     let impactType: 'positive' | 'negative' | 'neutral' = 'neutral';
     const assumptions: string[] = [];
 
-    // Scenario A: Feed Price increase/decrease (e.g. "feed price increases by ₹3/kg" or "feed price +₹2")
     if (q.includes('feed price') || (q.includes('feed') && (q.includes('increase') || q.includes('decrease') || q.includes('price')))) {
       const match = query.match(/(?:₹|rs\.?|by|\+|-)?\s*(\d+(?:\.\d+)?)\s*(?:\/kg|rs|rupees|per kg)?/i);
       let deltaFeedPrice = match ? parseFloat(match[1]) : 3;
@@ -247,10 +239,8 @@ export class ChickAIEngine {
       scenarioTitle = `Feed Price ${deltaFeedPrice > 0 ? `+₹${deltaFeedPrice}` : `-₹${Math.abs(deltaFeedPrice)}`}/kg`;
       assumptions.push(`Feed consumption held constant at ${Math.round(totalFeedKg).toLocaleString()} kg across ${alive.toLocaleString()} birds.`);
       assumptions.push(`Adjusted feed price: ₹ ${(baseFeedCostPerKg + deltaFeedPrice).toFixed(2)}/kg.`);
-    }
-    // Scenario B: Selling price change (e.g. "selling price decreases by ₹5/kg")
-    else if (q.includes('selling price') || q.includes('market price') || q.includes('rate')) {
-      const match = query.match(/(?:₹|rs\.?|by|\+|-)?\s*(\d+(?:\.\d+)?)\s*(?:\/kg|rs|rupees|per kg)?/i);
+    } else if (q.includes('selling price') || q.includes('market price') || q.includes('rate')) {
+      const match = query.match(/(?:₹|at|@|by|\+|-)?\s*(\d+(?:\.\d+)?)\s*(?:\/kg|rs|rupees|per kg)?/i);
       let deltaRate = match ? parseFloat(match[1]) : 5;
       const isDecrease = q.includes('decrease') || q.includes('drop') || q.includes('down') || q.includes('-');
       if (isDecrease) deltaRate = -Math.abs(deltaRate);
@@ -263,9 +253,7 @@ export class ChickAIEngine {
       scenarioTitle = `Selling Price ${deltaRate > 0 ? `+₹${deltaRate}` : `-₹${Math.abs(deltaRate)}`}/kg`;
       assumptions.push(`Flock harvest weight: ${targetWeight} kg/bird (${(alive * targetWeight).toFixed(0)} total live kg).`);
       assumptions.push(`Adjusted farm-gate rate: ₹ ${(baseSellingRate + deltaRate).toFixed(2)}/kg.`);
-    }
-    // Scenario C: Mortality increase to X% (e.g. "mortality increases to 5%")
-    else if (q.includes('mortality') && (q.includes('%') || q.includes('percent') || q.includes('dead'))) {
+    } else if (q.includes('mortality') && (q.includes('%') || q.includes('percent') || q.includes('dead'))) {
       const match = query.match(/(\d+(?:\.\d+)?)\s*%/);
       const targetMortalityPct = match ? parseFloat(match[1]) : 5.0;
       const newDead = Math.round((activeBatch?.totalChicks || 5000) * (targetMortalityPct / 100));
@@ -277,9 +265,7 @@ export class ChickAIEngine {
       impactType = newProfit >= originalProfit ? 'positive' : 'negative';
       scenarioTitle = `Mortality at ${targetMortalityPct}% (${newDead} dead birds)`;
       assumptions.push(`Harvest population reduced from ${alive.toLocaleString()} to ${newAlive.toLocaleString()} birds.`);
-    }
-    // Scenario D: Feed reduction (e.g. "reduce feed consumption by 5%")
-    else {
+    } else {
       const deltaCost = Math.round(baseFeedCost * 0.05);
       newProfit = originalProfit + deltaCost;
       impactAmount = deltaCost;
@@ -302,7 +288,81 @@ export class ChickAIEngine {
   }
 
   // ==========================================
-  // 5. MASTER QUERY PROCESSOR
+  // PARSING UTILITIES
+  // ==========================================
+  private parseAmount(query: string, history: ChickAIMessage[] = []): number | null {
+    const q = query.toLowerCase();
+
+    // Check k/lakh notation: e.g. "1.5k" -> 1500, "50k" -> 50000, "1 lakh" -> 100000
+    const kMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:k|thousand)/i);
+    if (kMatch) return parseFloat(kMatch[1]) * 1000;
+
+    const lakhMatch = q.match(/(\d+(?:\.\d+)?)\s*(?:lakh|lac|l)\b/i);
+    if (lakhMatch) return parseFloat(lakhMatch[1]) * 100000;
+
+    // Regular numbers with or without ₹ / Rs / commas
+    const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})+|\d+)(?:\s*(?:rupees|rs|inr|\/-))?/i);
+    if (amountMatch && amountMatch[1]) {
+      const val = parseFloat(amountMatch[1].replace(/,/g, ''));
+      if (!isNaN(val) && val > 0) return val;
+    }
+
+    // Fallback: Check if previous turn had an amount (slot-filling when clicking category chips)
+    if (history && history.length > 0) {
+      for (let i = history.length - 1; i >= 0; i--) {
+        const prev = history[i];
+        const prevAmtMatch = prev.text.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})+|\d+)/i);
+        if (prevAmtMatch && prevAmtMatch[1]) {
+          const val = parseFloat(prevAmtMatch[1].replace(/,/g, ''));
+          if (!isNaN(val) && val > 0) return val;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  private parseCategory(query: string): string | null {
+    const q = query.toLowerCase();
+    if (q.includes('feed') || q.includes('ration') || q.includes('starter') || q.includes('finisher') || q.includes('grower')) return 'Feed';
+    if (q.includes('medicine') || q.includes('vaccine') || q.includes('meds') || q.includes('antibiotic') || q.includes('vitamin')) return 'Medicine';
+    if (q.includes('electricity') || q.includes('power') || q.includes('current') || q.includes('eb bill') || q.includes('eb')) return 'Electricity';
+    if (q.includes('labour') || q.includes('labor') || q.includes('wage') || q.includes('wages') || q.includes('salary') || q.includes('worker')) return 'Labour';
+    if (q.includes('maintenance') || q.includes('repair') || q.includes('repairs') || q.includes('equipment') || q.includes('motor')) return 'Maintenance';
+    if (q.includes('chick') || q.includes('doc') || q.includes('bird purchase') || q.includes('placement')) return 'Chicks';
+    if (q.includes('transport') || q.includes('diesel') || q.includes('truck') || q.includes('freight') || q.includes('vehicle')) return 'Transportation';
+    if (q.includes('other') || q.includes('misc') || q.includes('general') || q.includes('miscellaneous')) return 'Other';
+    return null;
+  }
+
+  private extractBatch(query: string): any | null {
+    if (!this.context.batches || this.context.batches.length === 0) return null;
+
+    for (const b of this.context.batches) {
+      const bNum = b.batchNumber.toLowerCase();
+      const bName = (b.batchName || '').toLowerCase();
+      const numOnly = bNum.replace(/\D/g, '');
+
+      if (query.includes(bNum) || (numOnly && query.includes(`batch ${numOnly}`)) || (numOnly && query.includes(`b-${numOnly}`)) || (numOnly && query.includes(`batch #${numOnly}`))) {
+        return b;
+      }
+      if (bName && query.includes(bName)) {
+        return b;
+      }
+    }
+
+    const matchedNumber = query.match(/\b\d{1,4}\b/);
+    if (matchedNumber) {
+      const numStr = matchedNumber[0];
+      const match = this.context.batches.find((b) => b.batchNumber.toLowerCase().includes(numStr));
+      if (match) return match;
+    }
+
+    return null;
+  }
+
+  // ==========================================
+  // 5. MASTER QUERY & ACTION PROCESSOR
   // ==========================================
   public processQuery(userQuery: string, history: ChickAIMessage[] = []): ChickAIMessage {
     const queryLower = userQuery.toLowerCase().trim();
@@ -319,8 +379,8 @@ export class ChickAIEngine {
       this.lastMentionedBatchId = targetBatch.id;
     }
 
-    // 1. Check for Action Requests (Expenses, Mortality, Sales, Tasks, Filtering)
-    const actionProposal = this.checkActionProposal(userQuery, targetBatch);
+    // 1. Check for Action Requests (Expenses, Mortality, Sales, Tasks, Filtering, Edits, Deletes)
+    const actionProposal = this.checkActionProposal(userQuery, targetBatch, history);
     if (actionProposal) {
       return {
         id: `msg-${Date.now()}`,
@@ -328,6 +388,7 @@ export class ChickAIEngine {
         text: actionProposal.text,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         actionProposal: actionProposal.proposal,
+        clarificationOptions: actionProposal.clarificationOptions,
       };
     }
 
@@ -553,36 +614,10 @@ ${score.opportunityNote}`;
   }
 
   // ==========================================
-  // HELPER METHODS
+  // ACTION PROPOSAL PARSER & DISPATCHER
   // ==========================================
-  private extractBatch(query: string): any | null {
-    if (!this.context.batches || this.context.batches.length === 0) return null;
-
-    for (const b of this.context.batches) {
-      const bNum = b.batchNumber.toLowerCase();
-      const bName = (b.batchName || '').toLowerCase();
-      const numOnly = bNum.replace(/\D/g, '');
-
-      if (query.includes(bNum) || (numOnly && query.includes(`batch ${numOnly}`)) || (numOnly && query.includes(`b-${numOnly}`)) || (numOnly && query.includes(`batch #${numOnly}`))) {
-        return b;
-      }
-      if (bName && query.includes(bName)) {
-        return b;
-      }
-    }
-
-    const matchedNumber = query.match(/\b\d{1,4}\b/);
-    if (matchedNumber) {
-      const numStr = matchedNumber[0];
-      const match = this.context.batches.find((b) => b.batchNumber.toLowerCase().includes(numStr));
-      if (match) return match;
-    }
-
-    return null;
-  }
-
-  private checkActionProposal(query: string, targetBatch: any | null): { text: string; proposal?: any; clarificationOptions?: any } | null {
-    const q = query.toLowerCase();
+  private checkActionProposal(query: string, targetBatch: any | null, history: ChickAIMessage[] = []): { text: string; proposal?: ActionProposal; clarificationOptions?: any } | null {
+    const q = query.toLowerCase().trim();
     const batch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
 
     // 1. Filter Batches request (e.g. "Show batches with mortality above 4%")
@@ -628,12 +663,11 @@ ${score.opportunityNote}`;
     }
 
     // 3. Edit / Update Expense Action (e.g. "Change the ₹1000 feed expense to ₹1200", "Update yesterday's electricity expense to ₹2500")
-    if ((q.includes('change') || q.includes('update') || q.includes('edit') || q.includes('modify')) && (q.includes('expense') || q.includes('feed') || q.includes('electricity') || q.includes('labour') || q.includes('medicine'))) {
+    if ((q.includes('change') || q.includes('update') || q.includes('edit') || q.includes('modify')) && (q.includes('expense') || q.includes('feed') || q.includes('electricity') || q.includes('labour') || q.includes('medicine') || q.includes('cost'))) {
       const amounts = [...query.matchAll(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)/gi)].map((m) => parseFloat(m[1].replace(/,/g, '')));
       let oldAmount = amounts.length >= 2 ? amounts[0] : null;
       let newAmount = amounts.length >= 2 ? amounts[1] : (amounts[0] || 1200);
 
-      // Find matching expense in database
       const matchingExp = this.context.expenses.find((e) => (oldAmount ? e.amount === oldAmount : true) || (q.includes(e.category.toLowerCase()))) || this.context.expenses[0];
 
       if (matchingExp) {
@@ -657,10 +691,8 @@ ${score.opportunityNote}`;
 
     // 4. Delete Expense Action (e.g. "Delete the ₹1,000 feed expense", "Remove maintenance expense")
     if ((q.includes('delete') || q.includes('remove') || q.includes('cancel')) && (q.includes('expense') || q.includes('cost'))) {
-      const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)/i);
-      const targetAmount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
-
-      const matchingExp = this.context.expenses.find((e) => (targetAmount ? e.amount === targetAmount : true) || q.includes(e.category.toLowerCase())) || this.context.expenses[0];
+      const amount = this.parseAmount(query, history);
+      const matchingExp = this.context.expenses.find((e) => (amount ? e.amount === amount : true) || q.includes(e.category.toLowerCase())) || this.context.expenses[0];
 
       if (matchingExp) {
         return {
@@ -680,79 +712,9 @@ ${score.opportunityNote}`;
       }
     }
 
-    // 5. Add Expense Action & Missing Category Clarification
-    if ((q.includes('add') || q.includes('record') || q.includes('create') || q.includes('save') || q.includes('spent') || q.includes('paid') || q.includes('log') || q.includes('put')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('feed') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance') || q.includes('medicine') || q.includes('transportation'))) {
-      const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:rupees|rs|inr))?/i);
-      const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
-
-      let category: string | null = null;
-      if (q.includes('feed')) category = 'Feed';
-      else if (q.includes('medicine') || q.includes('vaccine')) category = 'Medicine';
-      else if (q.includes('electricity') || q.includes('power')) category = 'Electricity';
-      else if (q.includes('labour') || q.includes('labor') || q.includes('wage') || q.includes('salary')) category = 'Labour';
-      else if (q.includes('maintenance') || q.includes('repair')) category = 'Maintenance';
-      else if (q.includes('chick')) category = 'Chicks';
-      else if (q.includes('transport')) category = 'Transportation';
-
-      // If user provided amount but NO category ("Add 1000 as an expense", "Add ₹1,000 expense")
-      if (amount && amount > 0 && !category && !q.includes('miscellaneous')) {
-        return {
-          text: `I understood you want to record an expense of **₹ ${amount.toLocaleString('en-IN')}**.\n\nWhich category should I assign this to?`,
-          clarificationOptions: {
-            field: 'category',
-            options: ['Feed', 'Medicine', 'Electricity', 'Labour', 'Maintenance', 'Chicks', 'Transportation', 'Other'],
-          },
-        };
-      }
-
-      const finalCategory = category || 'Other';
-      if (amount && amount > 0) {
-        return {
-          text: `I prepared the following expense record:\n\n• **Amount:** **₹ ${amount.toLocaleString('en-IN')}**\n• **Category:** ${finalCategory}\n• **Target Batch:** ${batch ? batch.batchNumber : 'General Farm'}\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n• **Description:** ${finalCategory} expense logged via ChickAI\n\nWould you like me to save this expense to your database?`,
-          proposal: {
-            type: 'create_expense',
-            title: `Save ₹${amount.toLocaleString('en-IN')} ${finalCategory} Expense`,
-            details: {
-              category: finalCategory,
-              amount,
-              batchId: batch ? batch.id : undefined,
-              batchNumber: batch ? batch.batchNumber : 'General Farm',
-              description: `ChickAI logged: ${finalCategory} expense`,
-              date: new Date().toISOString().split('T')[0],
-            },
-            status: 'pending',
-          },
-        };
-      }
-    }
-
-    // 6. Add Feed Usage / Consumption Action (e.g. "Add 500 kg feed usage to Batch 45", "Record 200 kg feed consumed")
-    if ((q.includes('feed usage') || q.includes('feed consumed') || q.includes('kg feed')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
-      const kgMatch = query.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|bags)?/i);
-      const feedKg = kgMatch ? parseFloat(kgMatch[1]) : 200;
-
-      if (batch) {
-        return {
-          text: `I prepared the following feed consumption record:\n\n• **Batch:** ${batch.batchNumber}\n• **Feed Consumed:** **${feedKg} kg** (~${Math.round(feedKg / 50)} bags)\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n\nDo you want me to record this feed consumption?`,
-          proposal: {
-            type: 'add_mortality',
-            title: `Log ${feedKg} kg Feed Usage for ${batch.batchNumber}`,
-            details: {
-              batchId: batch.id,
-              batchNumber: batch.batchNumber,
-              deadChicks: 0,
-              feedConsumed: feedKg,
-              averageWeight: 0,
-            },
-            status: 'pending',
-          },
-        };
-      }
-    }
-
-    // 7. Add Mortality Action
-    if ((q.includes('dead') || q.includes('mortality') || q.includes('died')) && (q.includes('add') || q.includes('log') || q.includes('record'))) {
-      const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality)?/i);
+    // 5. Add Mortality Action (e.g. "Add 20 dead birds to Batch 45", "Record 50 birds died today in Batch 45")
+    if ((q.includes('dead') || q.includes('mortality') || q.includes('died') || q.includes('deaths')) && (q.includes('add') || q.includes('log') || q.includes('record') || q.match(/\d+\s*dead/))) {
+      const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality|died)?/i);
       const count = countMatch ? parseInt(countMatch[1], 10) : null;
 
       if (count && count > 0 && batch) {
@@ -781,9 +743,33 @@ ${score.opportunityNote}`;
       }
     }
 
-    // 8. Add Sale Action
-    if ((q.includes('sale') || q.includes('sold')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
-      const birdsMatch = query.match(/(\d+)\s*(?:birds|chickens|chicks)/i);
+    // 6. Add Feed Usage / Consumption Action (e.g. "Add 500 kg feed usage to Batch 45", "Record 200 kg feed consumed")
+    if ((q.includes('feed usage') || q.includes('feed consumed') || q.includes('kg feed') || q.includes('bags feed') || (q.includes('feed') && q.includes('consumed')))) {
+      const kgMatch = query.match(/(\d+(?:\.\d+)?)\s*(?:kg|kilos|bags)?/i);
+      const feedKg = kgMatch ? parseFloat(kgMatch[1]) : 200;
+
+      if (batch) {
+        return {
+          text: `I prepared the following feed consumption record:\n\n• **Batch:** ${batch.batchNumber}\n• **Feed Consumed:** **${feedKg} kg** (~${Math.round(feedKg / 50)} bags)\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n\nDo you want me to record this feed consumption?`,
+          proposal: {
+            type: 'add_mortality',
+            title: `Log ${feedKg} kg Feed Usage for ${batch.batchNumber}`,
+            details: {
+              batchId: batch.id,
+              batchNumber: batch.batchNumber,
+              deadChicks: 0,
+              feedConsumed: feedKg,
+              averageWeight: 0,
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
+    // 7. Add Sale Action (e.g. "Record sale of 500 birds at ₹118", "Add 1000 birds sale")
+    if ((q.includes('sale') || q.includes('sold') || q.includes('dispatch') || q.includes('selling')) && (q.includes('add') || q.includes('record') || q.includes('log') || q.includes('birds') || q.includes('chickens'))) {
+      const birdsMatch = query.match(/(\d+)\s*(?:birds|chickens|chicks|hens)/i);
       const rateMatch = query.match(/(?:₹|at|@|rs\.?)\s*(\d+)/i);
       const birdsSold = birdsMatch ? parseInt(birdsMatch[1], 10) : 500;
       const rate = rateMatch ? parseFloat(rateMatch[1]) : 115;
@@ -808,9 +794,89 @@ ${score.opportunityNote}`;
       };
     }
 
+    // 8. General / Specific Expense Creation & Clarification
+    // Matches:
+    // - "Add 1000 as an expense"
+    // - "Add ₹1,000 expense"
+    // - "Add 5000 for feed"
+    // - "Add 10000 electricity expense to Batch 45"
+    // - "Record ₹8000 labour expense for Batch 43"
+    // - "Spent ₹3000 on maintenance for Batch 45"
+    // - "Spent 1000 on feed"
+    // - "Put 1000 under feed expenses"
+    // - "Set category as Feed"
+    const isExpenseIntent = (
+      q.includes('add') ||
+      q.includes('record') ||
+      q.includes('create') ||
+      q.includes('save') ||
+      q.includes('spent') ||
+      q.includes('paid') ||
+      q.includes('put') ||
+      q.includes('log') ||
+      q.includes('expense') ||
+      q.includes('cost') ||
+      q.includes('bill') ||
+      q.startsWith('set category as') ||
+      q.startsWith('category') ||
+      q.includes('for feed') ||
+      q.includes('on feed') ||
+      q.includes('for medicine') ||
+      q.includes('on medicine') ||
+      q.includes('for electricity') ||
+      q.includes('for labour') ||
+      q.includes('for maintenance')
+    ) && !q.includes('how much') && !q.includes('what is') && !q.includes('show') && !q.includes('compare');
+
+    if (isExpenseIntent) {
+      const amount = this.parseAmount(query, history);
+      let category = this.parseCategory(query);
+
+      // If user clicked category chip like "Set category as Feed" or typed "Feed"
+      if (!category && q.startsWith('set category as')) {
+        const catName = q.replace('set category as', '').trim();
+        category = this.parseCategory(catName) || 'Other';
+      }
+
+      // If amount found but NO category
+      if (amount && amount > 0 && !category) {
+        return {
+          text: `I understood you want to record an expense of **₹ ${amount.toLocaleString('en-IN')}**.\n\nWhich category should I assign this to?`,
+          clarificationOptions: {
+            field: 'category',
+            options: ['Feed', 'Medicine', 'Electricity', 'Labour', 'Maintenance', 'Chicks', 'Transportation', 'Other'],
+          },
+        };
+      }
+
+      // If both amount and category are known
+      if (amount && amount > 0 && category) {
+        const batchNum = batch ? batch.batchNumber : 'General Farm';
+        return {
+          text: `I prepared the following expense record:\n\n• **Amount:** **₹ ${amount.toLocaleString('en-IN')}**\n• **Category:** ${category}\n• **Target Batch:** ${batchNum}\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n• **Description:** ${category} expense logged via ChickAI\n\nWould you like me to save this expense to your database?`,
+          proposal: {
+            type: 'create_expense',
+            title: `Save ₹${amount.toLocaleString('en-IN')} ${category} Expense`,
+            details: {
+              category,
+              amount,
+              batchId: batch ? batch.id : undefined,
+              batchNumber: batchNum,
+              description: `ChickAI logged: ${category} expense`,
+              date: new Date().toISOString().split('T')[0],
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
     return null;
   }
 
+  // ==========================================
+  // QUERY RESPONSES
+  // ==========================================
   public getBatchDetailResponse(batch: any): string {
     const startDate = new Date(batch.startDate);
     const today = new Date();
@@ -1113,11 +1179,12 @@ I am directly connected to your farm database with real-time biometric and finan
 • 💰 **Total Realized Sales:** ₹ ${(stats?.totalRevenue || 0).toLocaleString('en-IN')}
 • 💸 **Total Expenditure:** ₹ ${(stats?.totalExpenditure || 0).toLocaleString('en-IN')}
 
-**Try asking me:**
-- *"Calculate my Farm AI Score"*
+**Try these direct commands:**
+- *"Add ₹1,000 for feed"*
+- *"Add 10000 electricity expense to Batch 45"*
+- *"Add 20 dead birds to Batch 45"*
+- *"Record sale of 500 birds at ₹118"*
 - *"What if feed price increases by ₹3/kg?"*
-- *"Show batches with mortality above 4%"*
-- *"Send weekly report to 9849852085 in Excel format"*
-- *"Add ₹12,000 electricity expense to Batch 45"*`;
+- *"Calculate my Farm AI Score"*`;
   }
 }
