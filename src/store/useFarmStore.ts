@@ -8,7 +8,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 export type Theme = 'light' | 'dark' | 'obsidian';
 
-// Allowed phone numbers (only these can log in)
 export const ALLOWED_PHONES = ['9502828293', '9849852085'];
 
 export interface User {
@@ -94,22 +93,42 @@ export interface DashboardStats {
   estimatedProfit: number;
 }
 
-// ─── Default user (used for admin login) ─────────────────────────────────────
+// ─── Per-phone localStorage helpers ──────────────────────────────────────────
+
+interface PhoneData {
+  batches: Batch[];
+  expenses: Expense[];
+  revenues: Revenue[];
+  notifications: Notification[];
+  settings: Settings;
+}
+
+function phoneKey(phone: string): string {
+  return `chickfarm-user-${phone.replace(/[^0-9a-z]/gi, '')}`;
+}
+
+function saveToPhone(phone: string, data: PhoneData): void {
+  if (typeof window === 'undefined') return;
+  try { localStorage.setItem(phoneKey(phone), JSON.stringify(data)); } catch { /* ignore */ }
+}
+
+function loadFromPhone(phone: string): PhoneData | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem(phoneKey(phone));
+    return raw ? JSON.parse(raw) : null;
+  } catch { return null; }
+}
+
+// ─── Default values ──────────────────────────────────────────────────────────
 
 const defaultUser: User = {
-  id: uuidv4(),
-  name: 'John',
-  email: 'admin@chickfarm.com',
-  role: 'admin',
-  avatar: undefined,
-  createdAt: '2026-01-01T00:00:00Z',
+  id: uuidv4(), name: 'John', email: 'admin@chickfarm.com',
+  role: 'admin', avatar: undefined, createdAt: '2026-01-01T00:00:00Z',
 };
 
 const defaultSettings: Settings = {
-  farmName: 'GreenField Poultry Farm',
-  currency: '₹',
-  language: 'en',
-  theme: 'light',
+  farmName: 'GreenField Poultry Farm', currency: '₹', language: 'en', theme: 'light',
 };
 
 // ─── Store Interface ─────────────────────────────────────────────────────────
@@ -161,52 +180,80 @@ interface FarmState {
   getExpensesByCategory: () => Record<string, number>;
 }
 
+// ─── Helper: save current state to phone storage ─────────────────────────────
+
+function persistToPhone(get: () => FarmState) {
+  const s = get();
+  if (!s.currentPhone) return;
+  saveToPhone(s.currentPhone, {
+    batches: s.batches, expenses: s.expenses, revenues: s.revenues,
+    notifications: s.notifications, settings: s.settings,
+  });
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export const useFarmStore = create<FarmState>()(
   persist(
     (set, get) => ({
-      // ── Auth ──────────────────────────────────────────────────────
       user: null,
       isAuthenticated: false,
       currentPhone: null,
 
-      login: (email: string, password: string) => {
+      // ── Auth ──────────────────────────────────────────────────────
+      login: (email, password) => {
         if (email === 'admin@chickfarm.com' && password === 'admin123') {
-          set({ user: { ...defaultUser, id: defaultUser.id }, isAuthenticated: true, currentPhone: 'admin' });
+          const phone = 'admin';
+          const existing = loadFromPhone(phone);
+          set({
+            user: { ...defaultUser }, isAuthenticated: true, currentPhone: phone,
+            batches: existing?.batches ?? [], expenses: existing?.expenses ?? [],
+            revenues: existing?.revenues ?? [], notifications: existing?.notifications ?? [],
+            settings: existing?.settings ?? { ...defaultSettings, theme: get().theme },
+          });
           return true;
         }
         return false;
       },
 
-      loginWithPhone: (phone: string) => {
-        const cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (!ALLOWED_PHONES.includes(cleanPhone)) {
-          return { success: false, error: 'This phone number is not authorized. Contact your administrator.' };
+      loginWithPhone: (phone) => {
+        const clean = phone.replace(/[^0-9]/g, '');
+        if (!ALLOWED_PHONES.includes(clean)) {
+          return { success: false, error: 'This phone number is not authorized.' };
         }
+        const existing = loadFromPhone(clean);
         set({
-          user: { ...defaultUser, id: defaultUser.id, name: `User ${cleanPhone.slice(-4)}`, phone: cleanPhone },
-          isAuthenticated: true,
-          currentPhone: cleanPhone,
+          user: { ...defaultUser, id: uuidv4(), name: `User ${clean.slice(-4)}`, phone: clean },
+          isAuthenticated: true, currentPhone: clean,
+          batches: existing?.batches ?? [], expenses: existing?.expenses ?? [],
+          revenues: existing?.revenues ?? [], notifications: existing?.notifications ?? [],
+          settings: existing?.settings ?? { ...defaultSettings, theme: get().theme },
         });
         return { success: true };
       },
 
-      logout: () => set({ user: null, isAuthenticated: false, currentPhone: null }),
+      logout: () => {
+        persistToPhone(get); // save before logout
+        set({
+          user: null, isAuthenticated: false, currentPhone: null,
+          batches: [], expenses: [], revenues: [], notifications: [],
+          settings: defaultSettings,
+        });
+      },
 
-      // ── Theme (3-way: light, dark, obsidian) ──────────────────────
+      // ── Theme ─────────────────────────────────────────────────────
       theme: 'light',
-      setTheme: (theme: Theme) => {
+      setTheme: (theme) => {
         set({ theme });
         if (typeof document !== 'undefined') {
           document.documentElement.classList.remove('dark', 'obsidian');
           if (theme !== 'light') document.documentElement.classList.add(theme);
         }
+        persistToPhone(get);
       },
       cycleTheme: () => {
-        const current = get().theme;
-        const next: Theme = current === 'light' ? 'dark' : current === 'dark' ? 'obsidian' : 'light';
-        get().setTheme(next);
+        const cur = get().theme;
+        get().setTheme(cur === 'light' ? 'dark' : cur === 'dark' ? 'obsidian' : 'light');
       },
 
       // ── Sidebar ───────────────────────────────────────────────────
@@ -218,14 +265,13 @@ export const useFarmStore = create<FarmState>()(
       batches: [],
       addBatch: (batch) => {
         const newBatch: Batch = {
-          ...batch,
-          id: uuidv4(),
+          ...batch, id: uuidv4(),
           chicksAlive: batch.totalChicks - batch.chicksDead,
           mortalityPercentage: batch.totalChicks > 0 ? (batch.chicksDead / batch.totalChicks) * 100 : 0,
-          dailyMortality: [],
-          createdAt: new Date().toISOString(),
+          dailyMortality: [], createdAt: new Date().toISOString(),
         };
         set((s) => ({ batches: [...s.batches, newBatch] }));
+        setTimeout(() => persistToPhone(get), 0);
       },
       updateBatch: (id, updates) => {
         set((s) => ({
@@ -237,71 +283,68 @@ export const useFarmStore = create<FarmState>()(
             return u;
           }),
         }));
+        setTimeout(() => persistToPhone(get), 0);
       },
-      deleteBatch: (id) => set((s) => ({ batches: s.batches.filter((b) => b.id !== id) })),
+      deleteBatch: (id) => { set((s) => ({ batches: s.batches.filter((b) => b.id !== id) })); setTimeout(() => persistToPhone(get), 0); },
       recordMortality: (batchId, deaths) => {
         set((s) => ({
           batches: s.batches.map((b) => {
             if (b.id !== batchId) return b;
-            const newDead = b.chicksDead + deaths;
-            const date = new Date().toISOString().split('T')[0];
-            const lastCum = b.dailyMortality.length > 0 ? b.dailyMortality[b.dailyMortality.length - 1].cumulative : 0;
-            return {
-              ...b, chicksDead: newDead, chicksAlive: b.totalChicks - newDead,
-              mortalityPercentage: b.totalChicks > 0 ? (newDead / b.totalChicks) * 100 : 0,
-              dailyMortality: [...b.dailyMortality, { date, deaths, cumulative: lastCum + deaths }],
-            };
+            const nd = b.chicksDead + deaths;
+            const d = new Date().toISOString().split('T')[0];
+            const lc = b.dailyMortality.length > 0 ? b.dailyMortality[b.dailyMortality.length - 1].cumulative : 0;
+            return { ...b, chicksDead: nd, chicksAlive: b.totalChicks - nd,
+              mortalityPercentage: b.totalChicks > 0 ? (nd / b.totalChicks) * 100 : 0,
+              dailyMortality: [...b.dailyMortality, { date: d, deaths, cumulative: lc + deaths }] };
           }),
         }));
+        setTimeout(() => persistToPhone(get), 0);
       },
 
       // ── Expenses ──────────────────────────────────────────────────
       expenses: [],
-      addExpense: (expense) => set((s) => ({ expenses: [...s.expenses, { ...expense, id: uuidv4(), createdAt: new Date().toISOString() }] })),
-      updateExpense: (id, updates) => set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...updates } : e)) })),
-      deleteExpense: (id) => set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) })),
+      addExpense: (expense) => { set((s) => ({ expenses: [...s.expenses, { ...expense, id: uuidv4(), createdAt: new Date().toISOString() }] })); setTimeout(() => persistToPhone(get), 0); },
+      updateExpense: (id, updates) => { set((s) => ({ expenses: s.expenses.map((e) => (e.id === id ? { ...e, ...updates } : e)) })); setTimeout(() => persistToPhone(get), 0); },
+      deleteExpense: (id) => { set((s) => ({ expenses: s.expenses.filter((e) => e.id !== id) })); setTimeout(() => persistToPhone(get), 0); },
 
       // ── Revenue ───────────────────────────────────────────────────
       revenues: [],
-      addRevenue: (revenue) => {
-        const grossRevenue = revenue.sellingPricePerChicken * revenue.totalChickensSold;
-        set((s) => ({ revenues: [...s.revenues, { ...revenue, id: uuidv4(), grossRevenue, createdAt: new Date().toISOString() }] }));
+      addRevenue: (rev) => {
+        const gr = rev.sellingPricePerChicken * rev.totalChickensSold;
+        set((s) => ({ revenues: [...s.revenues, { ...rev, id: uuidv4(), grossRevenue: gr, createdAt: new Date().toISOString() }] }));
+        setTimeout(() => persistToPhone(get), 0);
       },
-      updateRevenue: (id, updates) => set((s) => ({ revenues: s.revenues.map((r) => (r.id === id ? { ...r, ...updates } : r)) })),
-      deleteRevenue: (id) => set((s) => ({ revenues: s.revenues.filter((r) => r.id !== id) })),
+      updateRevenue: (id, updates) => { set((s) => ({ revenues: s.revenues.map((r) => (r.id === id ? { ...r, ...updates } : r)) })); setTimeout(() => persistToPhone(get), 0); },
+      deleteRevenue: (id) => { set((s) => ({ revenues: s.revenues.filter((r) => r.id !== id) })); setTimeout(() => persistToPhone(get), 0); },
 
       // ── Notifications ─────────────────────────────────────────────
       notifications: [],
-      addNotification: (notification) => {
-        set((s) => ({
-          notifications: [{ ...notification, id: uuidv4(), read: false, createdAt: new Date().toISOString() }, ...s.notifications],
-        }));
-      },
-      markNotificationRead: (id) => set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })),
-      markAllNotificationsRead: () => set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })),
-      deleteNotification: (id) => set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })),
+      addNotification: (n) => { set((s) => ({ notifications: [{ ...n, id: uuidv4(), read: false, createdAt: new Date().toISOString() }, ...s.notifications] })); setTimeout(() => persistToPhone(get), 0); },
+      markNotificationRead: (id) => { set((s) => ({ notifications: s.notifications.map((n) => (n.id === id ? { ...n, read: true } : n)) })); setTimeout(() => persistToPhone(get), 0); },
+      markAllNotificationsRead: () => { set((s) => ({ notifications: s.notifications.map((n) => ({ ...n, read: true })) })); setTimeout(() => persistToPhone(get), 0); },
+      deleteNotification: (id) => { set((s) => ({ notifications: s.notifications.filter((n) => n.id !== id) })); setTimeout(() => persistToPhone(get), 0); },
 
       // ── Settings ──────────────────────────────────────────────────
       settings: defaultSettings,
-      updateSettings: (updates) => set((s) => ({ settings: { ...s.settings, ...updates } })),
+      updateSettings: (updates) => { set((s) => ({ settings: { ...s.settings, ...updates } })); setTimeout(() => persistToPhone(get), 0); },
 
-      // ── Derived / Computed ────────────────────────────────────────
+      // ── Computed ──────────────────────────────────────────────────
       getDashboardStats: () => {
         const s = get();
         const active = s.batches.filter((b) => b.status === 'growing');
         const totalChicks = s.batches.reduce((sum, b) => sum + b.totalChicks, 0);
         const aliveChicks = active.reduce((sum, b) => sum + b.chicksAlive, 0);
         const deadChicks = s.batches.reduce((sum, b) => sum + b.chicksDead, 0);
-        const byCategory = (cat: string) => s.expenses.filter((e) => e.category === cat).reduce((sum, e) => sum + e.amount, 0);
+        const byCat = (c: string) => s.expenses.filter((e) => e.category === c).reduce((sum, e) => sum + e.amount, 0);
         const totalExp = s.expenses.reduce((sum, e) => sum + e.amount, 0);
         const totalRev = s.revenues.reduce((sum, r) => sum + r.grossRevenue, 0);
         const expectedRev = totalRev + active.reduce((sum, b) => sum + 175 * b.chicksAlive, 0);
         return {
           totalBatches: s.batches.length, activeBatches: active.length, totalChicks, aliveChicks, deadChicks,
           mortalityPercentage: totalChicks > 0 ? (deadChicks / totalChicks) * 100 : 0,
-          feedConsumed: byCategory('feed'), feedRemaining: 250000 - (byCategory('feed') % 250000),
-          medicineCost: byCategory('medicine'), electricityCost: byCategory('electricity'),
-          labourCost: byCategory('labour'), maintenanceCost: byCategory('maintenance'),
+          feedConsumed: byCat('feed'), feedRemaining: 250000 - (byCat('feed') % 250000),
+          medicineCost: byCat('medicine'), electricityCost: byCat('electricity'),
+          labourCost: byCat('labour'), maintenanceCost: byCat('maintenance'),
           totalExpenditure: totalExp, totalRevenue: totalRev, expectedRevenue: expectedRev, estimatedProfit: expectedRev - totalExp,
         };
       },
@@ -311,17 +354,18 @@ export const useFarmStore = create<FarmState>()(
         get().expenses.reduce((acc, e) => { acc[e.category] = (acc[e.category] || 0) + e.amount; return acc; }, {} as Record<string, number>),
     }),
     {
-      name: 'chicken-farm-v2',
+      name: 'chickfarm-auth',
       partialize: (state) => ({
+        theme: state.theme,
+        isAuthenticated: state.isAuthenticated,
+        user: state.user,
+        currentPhone: state.currentPhone,
+        // Also persist farm data so it survives refresh
         batches: state.batches,
         expenses: state.expenses,
         revenues: state.revenues,
         notifications: state.notifications,
         settings: state.settings,
-        theme: state.theme,
-        isAuthenticated: state.isAuthenticated,
-        user: state.user,
-        currentPhone: state.currentPhone,
       }),
     }
   )
