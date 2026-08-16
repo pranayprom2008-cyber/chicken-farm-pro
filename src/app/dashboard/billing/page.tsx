@@ -257,171 +257,181 @@ export default function BillingPage() {
               />
             </div>
 
-            {/* Inputs based on active mode */}
-            <div className="space-y-4">
-              {calcMode === 'chick' && (
-                <>
-                  {/* Chick Rate (per unit) */}
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Chick Rate (per unit)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
-                        ₹
-                      </div>
-                      <input
-                        type="number"
-                        step="0.1"
-                        min="0"
-                        value={chickRate}
-                        onChange={(e) => setChickRate(e.target.value)}
-                        placeholder="Enter rate per chick (e.g. 38)"
-                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Number of Chicks */}
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Number of Chicks
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
-                        #
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        value={numberOfChicks}
-                        onChange={(e) => setNumberOfChicks(e.target.value)}
-                        placeholder="Enter quantity (e.g. 5000)"
-                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {calcMode === 'feed' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Number of Feed Bags (50kg each)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
-                        #
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        value={feedBags}
-                        onChange={(e) => setFeedBags(e.target.value)}
-                        placeholder="Enter number of bags (e.g. 100)"
-                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Price Per Bag (₹)
-                    </label>
-                    <div className="relative">
-                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
-                        ₹
-                      </div>
-                      <input
-                        type="number"
-                        min="0"
-                        value={feedBagPrice}
-                        onChange={(e) => setFeedBagPrice(e.target.value)}
-                        placeholder="e.g. 2150"
-                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                      />
-                    </div>
-                  </div>
-                </>
-              )}
-
-              {calcMode === 'fcr' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Total Feed Consumed (kg)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={fcrFeedTotalKg}
-                      onChange={(e) => setFcrFeedTotalKg(e.target.value)}
-                      placeholder="e.g. 15400"
-                      className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Total Weight Gained / Harvested (kg)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={fcrWeightTotalKg}
-                      onChange={(e) => setFcrWeightTotalKg(e.target.value)}
-                      placeholder="e.g. 9800"
-                      className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
-                    />
-                  </div>
-                </>
-              )}
-
-              {calcMode === 'medicine' && (
-                <>
-                  <div className="grid grid-cols-2 gap-3">
+            {/* Inputs based on active mode with simultaneous fluid transition */}
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={calcMode}
+                initial={{ opacity: 0, y: 6 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -6 }}
+                transition={{ duration: 0.18, ease: 'easeOut' }}
+                className="space-y-4"
+              >
+                {calcMode === 'chick' && (
+                  <>
+                    {/* Chick Rate (per unit) */}
                     <div>
                       <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                        Number of Birds
+                        Chick Rate (per unit)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                          ₹
+                        </div>
+                        <input
+                          type="number"
+                          step="0.1"
+                          min="0"
+                          value={chickRate}
+                          onChange={(e) => setChickRate(e.target.value)}
+                          placeholder="Enter rate per chick (e.g. 38)"
+                          className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Number of Chicks */}
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Number of Chicks
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                          #
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={numberOfChicks}
+                          onChange={(e) => setNumberOfChicks(e.target.value)}
+                          placeholder="Enter quantity (e.g. 5000)"
+                          className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {calcMode === 'feed' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Number of Feed Bags (50kg each)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                          #
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={feedBags}
+                          onChange={(e) => setFeedBags(e.target.value)}
+                          placeholder="Enter number of bags (e.g. 100)"
+                          className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Price Per Bag (₹)
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                          ₹
+                        </div>
+                        <input
+                          type="number"
+                          min="0"
+                          value={feedBagPrice}
+                          onChange={(e) => setFeedBagPrice(e.target.value)}
+                          placeholder="e.g. 2150"
+                          className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {calcMode === 'fcr' && (
+                  <>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Total Feed Consumed (kg)
                       </label>
                       <input
                         type="number"
                         min="0"
-                        value={medBirds}
-                        onChange={(e) => setMedBirds(e.target.value)}
-                        placeholder="e.g. 5000"
-                        className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                        value={fcrFeedTotalKg}
+                        onChange={(e) => setFcrFeedTotalKg(e.target.value)}
+                        placeholder="e.g. 15400"
+                        className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
                       />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                        Dosage (ml/bird)
+                        Total Weight Gained / Harvested (kg)
                       </label>
                       <input
                         type="number"
-                        step="0.01"
                         min="0"
-                        value={medDosagePerBird}
-                        onChange={(e) => setMedDosagePerBird(e.target.value)}
-                        placeholder="e.g. 0.2"
+                        value={fcrWeightTotalKg}
+                        onChange={(e) => setFcrWeightTotalKg(e.target.value)}
+                        placeholder="e.g. 9800"
+                        className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {calcMode === 'medicine' && (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                          Number of Birds
+                        </label>
+                        <input
+                          type="number"
+                          min="0"
+                          value={medBirds}
+                          onChange={(e) => setMedBirds(e.target.value)}
+                          placeholder="e.g. 5000"
+                          className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                          Dosage (ml/bird)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={medDosagePerBird}
+                          onChange={(e) => setMedDosagePerBird(e.target.value)}
+                          placeholder="e.g. 0.2"
+                          className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Cost per Litre (₹)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={medCostPerLitre}
+                        onChange={(e) => setMedCostPerLitre(e.target.value)}
+                        placeholder="e.g. 1400"
                         className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
                       />
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                      Cost per Litre (₹)
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={medCostPerLitre}
-                      onChange={(e) => setMedCostPerLitre(e.target.value)}
-                      placeholder="e.g. 1400"
-                      className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
-                    />
-                  </div>
-                </>
-              )}
+                  </>
+                )}
+              </motion.div>
+            </AnimatePresence>
 
               {/* Optional Batch Selection & Notes */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -530,7 +540,6 @@ export default function BillingPage() {
                 </motion.div>
               )}
             </div>
-          </div>
           </TiltCard>
         </div>
 

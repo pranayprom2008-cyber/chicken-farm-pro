@@ -23,6 +23,7 @@ import {
   Scale
 } from 'lucide-react';
 import TiltCard from '@/components/TiltCard';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const emptyBatchForm = {
   batchNumber: '',
@@ -256,29 +257,37 @@ export default function BatchesPage() {
       </div>
 
       {/* Batches Grid */}
-      {filteredBatches.length === 0 ? (
-        <div
-          className={`p-12 text-center rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
-            isLiquid ? 'liquid-panel' : ''
-          }`}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={statusFilter + search}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -4 }}
+          transition={{ duration: 0.18, ease: 'easeOut' }}
         >
-          <Bird className="w-12 h-12 mx-auto text-[var(--text-muted)] opacity-40 mb-3" />
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">No Batches Found</h3>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            {batches.length === 0
-              ? 'Start by creating your first poultry batch to track birds, feed, and mortality.'
-              : 'No batches matched your search filter.'}
-          </p>
-          <button
-            onClick={handleOpenCreateModal}
-            className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all inline-flex items-center gap-1.5"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Create New Batch</span>
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {filteredBatches.length === 0 ? (
+            <div
+              className={`p-12 text-center rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
+                isLiquid ? 'liquid-panel' : ''
+              }`}
+            >
+              <Bird className="w-12 h-12 mx-auto text-[var(--text-muted)] opacity-40 mb-3" />
+              <h3 className="text-base font-semibold text-[var(--text-primary)]">No Batches Found</h3>
+              <p className="text-xs text-[var(--text-muted)] mt-1">
+                {batches.length === 0
+                  ? 'Start by creating your first poultry batch to track birds, feed, and mortality.'
+                  : 'No batches matched your search filter.'}
+              </p>
+              <button
+                onClick={handleOpenCreateModal}
+                className="mt-4 px-4 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 transition-all inline-flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Create New Batch</span>
+              </button>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           {filteredBatches.map((batch) => {
             const startFormatted = new Date(batch.startDate).toLocaleDateString('en-IN', {
               day: 'numeric',
@@ -424,6 +433,8 @@ export default function BatchesPage() {
           })}
         </div>
       )}
+        </motion.div>
+      </AnimatePresence>
 
       {/* Create / Edit Batch Modal */}
       {(showCreateModal || showEditModal) && (
