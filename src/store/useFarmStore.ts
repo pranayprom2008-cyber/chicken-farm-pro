@@ -579,7 +579,7 @@ export const useFarmStore = create<FarmState>()(
         // 1. Save to state & LocalStorage immediately
         set((state) => {
           const updatedBatches = [newBatch, ...state.batches];
-          const updatedStats = computeStatsFromState(updatedBatches, state.expenses);
+          const updatedStats = computeStatsFromState(updatedBatches, state.expenses, state.sales);
           return {
             batches: updatedBatches,
             stats: updatedStats,
@@ -625,7 +625,7 @@ export const useFarmStore = create<FarmState>()(
               mortalityPercentage: Number(mortality.toFixed(2)),
             };
           });
-          const updatedStats = computeStatsFromState(updatedBatches, state.expenses);
+          const updatedStats = computeStatsFromState(updatedBatches, state.expenses, state.sales);
           return { batches: updatedBatches, stats: updatedStats };
         });
 
@@ -646,7 +646,7 @@ export const useFarmStore = create<FarmState>()(
         set((state) => {
           const updatedBatches = state.batches.filter((b) => b.id !== id);
           const updatedExpenses = state.expenses.filter((e) => e.batchId !== id);
-          const updatedStats = computeStatsFromState(updatedBatches, updatedExpenses);
+          const updatedStats = computeStatsFromState(updatedBatches, updatedExpenses, state.sales);
           return {
             batches: updatedBatches,
             expenses: updatedExpenses,
@@ -697,7 +697,7 @@ export const useFarmStore = create<FarmState>()(
             updatedExpenses = [newExp, ...state.expenses];
           }
 
-          const updatedStats = computeStatsFromState(updatedBatches, updatedExpenses);
+          const updatedStats = computeStatsFromState(updatedBatches, updatedExpenses, state.sales);
           return {
             batches: updatedBatches,
             expenses: updatedExpenses,
@@ -779,7 +779,7 @@ export const useFarmStore = create<FarmState>()(
 
         set((state) => {
           const updatedExpenses = [newExp, ...state.expenses];
-          const updatedStats = computeStatsFromState(state.batches, updatedExpenses);
+          const updatedStats = computeStatsFromState(state.batches, updatedExpenses, state.sales);
           return {
             expenses: updatedExpenses,
             stats: updatedStats,
@@ -802,7 +802,7 @@ export const useFarmStore = create<FarmState>()(
       deleteExpense: async (id) => {
         set((state) => {
           const updatedExpenses = state.expenses.filter((e) => e.id !== id);
-          const updatedStats = computeStatsFromState(state.batches, updatedExpenses);
+          const updatedStats = computeStatsFromState(state.batches, updatedExpenses, state.sales);
           return {
             expenses: updatedExpenses,
             stats: updatedStats,
