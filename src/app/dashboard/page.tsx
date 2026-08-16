@@ -49,6 +49,7 @@ import FeedForecastWidget from '@/components/FeedForecastWidget';
 import TodayFarmBrief from '@/components/TodayFarmBrief';
 import AIFarmInsights from '@/components/AIFarmInsights';
 import AIProfitPrediction from '@/components/AIProfitPrediction';
+import FarmAIScoreWidget from '@/components/FarmAIScoreWidget';
 import { Send } from 'lucide-react';
 
 const containerVariants = {
@@ -378,8 +379,9 @@ export default function DashboardPage() {
         })}
       </motion.div>
 
-      {/* Today's AI Farm Executive Brief & Live Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+      {/* Farm AI Score, Today's Farm Brief & Live Insights */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <FarmAIScoreWidget />
         <TodayFarmBrief />
         <AIFarmInsights />
       </div>

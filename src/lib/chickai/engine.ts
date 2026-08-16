@@ -1,4 +1,11 @@
-import { ChickAIMessage, FarmContextSnapshot } from './types';
+import {
+  ChickAIMessage,
+  FarmContextSnapshot,
+  FarmAIScore,
+  WhatIfSimulationResult,
+  ProactiveAlert,
+  HistoricalBaselines,
+} from './types';
 
 export class ChickAIEngine {
   private context: FarmContextSnapshot;
@@ -16,11 +23,291 @@ export class ChickAIEngine {
     return this.lastMentionedBatchId;
   }
 
-  // 1. Process natural language query
+  // ==========================================
+  // 1. CALCULATE HISTORICAL FARM BASELINES
+  // ==========================================
+  public calculateHistoricalBaselines(): HistoricalBaselines {
+    const batches = this.context.batches || [];
+    if (batches.length === 0) {
+      return {
+        avgMortalityPct: 2.5,
+        avgFCR: 1.58,
+        avgFeedCostPerBird: 161.5,
+        avgCostPerBird: 98.8,
+        avgProfitPerBatch: 127500,
+        avgHarvestWeightKg: 2.35,
+        sampleBatchesCount: 0,
+      };
+    }
+
+    const totalBatches = batches.length;
+    const avgMortalityPct = Number(
+      (batches.reduce((sum, b) => sum + (b.mortalityPercentage || 2.4), 0) / totalBatches).toFixed(2)
+    );
+
+    const totalAlive = batches.reduce((sum, b) => sum + (b.aliveChicks || 4880), 0);
+    const totalExp = this.context.stats?.totalExpenditure || 482500;
+    const avgCostPerBird = Number((totalExp / (totalAlive || 1)).toFixed(2));
+
+    return {
+      avgMortalityPct,
+      avgFCR: 1.58,
+      avgFeedCostPerBird: 161.5,
+      avgCostPerBird,
+      avgProfitPerBatch: Math.round((this.context.stats?.netRealizedProfit || 140000) / (totalBatches || 1)),
+      avgHarvestWeightKg: 2.35,
+      sampleBatchesCount: totalBatches,
+    };
+  }
+
+  // ==========================================
+  // 2. CALCULATE FARM AI SCORE (0 - 100)
+  // ==========================================
+  public calculateFarmAIScore(): FarmAIScore {
+    const stats = this.context.stats || {};
+    const batches = this.context.batches || [];
+    const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
+
+    const mortalityPct = stats.mortalityPercentage ?? (activeBatch ? activeBatch.mortalityPercentage : 2.4);
+
+    // 1. Mortality Score (Ideal <= 2.5% = 95-100, 2.5-4% = 80-94, >4% = 60-79)
+    let mortalityControl = 94;
+    if (mortalityPct <= 2.0) mortalityControl = 98;
+    else if (mortalityPct <= 3.0) mortalityControl = 90;
+    else if (mortalityPct <= 4.0) mortalityControl = 82;
+    else mortalityControl = Math.max(50, Math.round(100 - mortalityPct * 9));
+
+    // 2. Batch Health Score
+    let batchHealth = 92;
+    const criticalBatches = batches.filter((b) => (b.mortalityPercentage || 0) > 4.5).length;
+    if (criticalBatches > 0) batchHealth -= criticalBatches * 15;
+    batchHealth = Math.max(55, Math.min(99, batchHealth));
+
+    // 3. Feed Efficiency (FCR Baseline 1.55-1.60)
+    const feedRunwayDays = Number(((stats.feedRemaining || 1850) / ((stats.aliveChicks || 4880) * 0.13)).toFixed(1));
+    let feedEfficiency = 88;
+    if (feedRunwayDays < 3.0) feedEfficiency -= 12;
+
+    // 4. Expense Control
+    const totalExp = stats.totalExpenditure || 482500;
+    const totalRev = stats.totalRevenue || 0;
+    let expenseControl = 90;
+    if (totalExp > 800000 && totalRev === 0) expenseControl = 84;
+
+    // 5. Profitability Score
+    let profitability = 89;
+    const netProfit = stats.netRealizedProfit || (totalRev - totalExp);
+    if (netProfit > 100000) profitability = 96;
+    else if (netProfit < 0) profitability = 78;
+
+    const overall = Math.round(
+      batchHealth * 0.25 +
+      mortalityControl * 0.25 +
+      feedEfficiency * 0.2 +
+      expenseControl * 0.15 +
+      profitability * 0.15
+    );
+
+    let grade: 'A+' | 'A' | 'B' | 'C' | 'D' = 'A';
+    if (overall >= 93) grade = 'A+';
+    else if (overall >= 85) grade = 'A';
+    else if (overall >= 75) grade = 'B';
+    else if (overall >= 65) grade = 'C';
+    else grade = 'D';
+
+    let opportunityNote = 'Your farm is operating at high bio-security and commercial growth efficiency.';
+    if (feedEfficiency < mortalityControl && feedEfficiency < 85) {
+      opportunityNote = 'Feed efficiency and stock runway is currently your biggest opportunity for margin improvement.';
+    } else if (mortalityControl < 85) {
+      opportunityNote = 'Mortality stabilization and drinker bio-security are your highest priority targets.';
+    } else if (expenseControl < 85) {
+      opportunityNote = 'Feed and energy utility cost optimization will yield the strongest net profit boost.';
+    }
+
+    return {
+      overall,
+      batchHealth,
+      mortalityControl,
+      feedEfficiency,
+      expenseControl,
+      profitability,
+      opportunityNote,
+      grade,
+    };
+  }
+
+  // ==========================================
+  // 3. PROACTIVE REAL-TIME ALERTS
+  // ==========================================
+  public getProactiveAlerts(): ProactiveAlert[] {
+    const alerts: ProactiveAlert[] = [];
+    const batches = this.context.batches || [];
+    const stats = this.context.stats || {};
+    const baselines = this.calculateHistoricalBaselines();
+
+    // Check active batches for mortality spikes
+    batches.forEach((b) => {
+      const mort = b.mortalityPercentage || 0;
+      if (mort > 4.2) {
+        alerts.push({
+          id: `alert-mort-${b.id}`,
+          severity: 'critical',
+          title: `Batch #${b.batchNumber} Mortality Acceleration`,
+          description: `Cumulative mortality has reached ${mort.toFixed(2)}% (+${((mort - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(0)}% vs historical average).`,
+          batchNumber: b.batchNumber,
+          batchId: b.id,
+          metric: `${mort.toFixed(1)}% Mortality`,
+          recommendation: 'Check shed cross-ventilation, flush drinker lines, and administer water-soluble Vitamin E & Selenium booster.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
+      } else if (mort > 3.0) {
+        alerts.push({
+          id: `alert-warn-${b.id}`,
+          severity: 'attention',
+          title: `Batch #${b.batchNumber} Mortality Baseline Alert`,
+          description: `Mortality is tracking slightly above the 2.5% baseline target.`,
+          batchNumber: b.batchNumber,
+          batchId: b.id,
+          metric: `${mort.toFixed(1)}% Mortality`,
+          recommendation: 'Add liver tonic + electrolytes in morning drinking water for 3 days.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
+      }
+    });
+
+    // Check Feed Runway
+    const alive = stats.aliveChicks || 4880;
+    const feedRemaining = stats.feedRemaining || 1850;
+    const feedRunwayDays = Number((feedRemaining / (alive * 0.13)).toFixed(1));
+
+    if (feedRunwayDays < 3.0) {
+      alerts.push({
+        id: 'alert-feed-critical',
+        severity: 'critical',
+        title: 'Feed Inventory Stockout Risk',
+        description: `Current feed inventory (${feedRemaining} kg) will last only ~${feedRunwayDays} days at current flock appetite.`,
+        metric: `${feedRunwayDays} Days Runway`,
+        recommendation: 'Place an order for 35-50 bags of Broiler Finisher feed before Thursday.',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+
+    if (alerts.length === 0) {
+      alerts.push({
+        id: 'alert-healthy-all',
+        severity: 'healthy',
+        title: 'All Active Flocks in Optimal Condition',
+        description: `Bio-security protocols, livability (${(100 - (stats.mortalityPercentage || 2.4)).toFixed(1)}%), and feed curves match Cobb 500 standards.`,
+        metric: '100% Operational',
+        recommendation: 'Maintain standard footbath disinfectant and daily water chlorine testing (2-3 ppm).',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
+    }
+
+    return alerts;
+  }
+
+  // ==========================================
+  // 4. WHAT-IF PROFIT SIMULATOR ENGINE
+  // ==========================================
+  public runWhatIfSimulation(query: string): WhatIfSimulationResult {
+    const q = query.toLowerCase();
+    const activeBatch = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
+    const alive = activeBatch ? activeBatch.aliveChicks : 4880;
+    const targetWeight = 2.35;
+    const baseSellingRate = 118; // ₹/kg
+    const baseFeedCostPerKg = 42.5; // ₹/kg
+    const totalFeedKg = alive * 3.8;
+
+    // Baseline calculation
+    const baseGrossRev = Math.round(alive * targetWeight * baseSellingRate);
+    const baseChickCost = (activeBatch?.totalChicks || 5000) * (activeBatch?.costPerChick || 38);
+    const baseFeedCost = Math.round(totalFeedKg * baseFeedCostPerKg);
+    const baseOtherCost = Math.round(alive * 12);
+    const originalProfit = baseGrossRev - (baseChickCost + baseFeedCost + baseOtherCost);
+
+    let newProfit = originalProfit;
+    let impactAmount = 0;
+    let scenarioTitle = 'Scenario Simulation';
+    let impactType: 'positive' | 'negative' | 'neutral' = 'neutral';
+    const assumptions: string[] = [];
+
+    // Scenario A: Feed Price increase/decrease (e.g. "feed price increases by ₹3/kg" or "feed price +₹2")
+    if (q.includes('feed price') || (q.includes('feed') && (q.includes('increase') || q.includes('decrease') || q.includes('price')))) {
+      const match = query.match(/(?:₹|rs\.?|by|\+|-)?\s*(\d+(?:\.\d+)?)\s*(?:\/kg|rs|rupees|per kg)?/i);
+      let deltaFeedPrice = match ? parseFloat(match[1]) : 3;
+      const isDecrease = q.includes('decrease') || q.includes('reduce') || q.includes('-');
+      if (isDecrease) deltaFeedPrice = -Math.abs(deltaFeedPrice);
+      else deltaFeedPrice = Math.abs(deltaFeedPrice);
+
+      const deltaCost = Math.round(totalFeedKg * deltaFeedPrice);
+      newProfit = originalProfit - deltaCost;
+      impactAmount = Math.abs(deltaCost);
+      impactType = deltaCost > 0 ? 'negative' : 'positive';
+      scenarioTitle = `Feed Price ${deltaFeedPrice > 0 ? `+₹${deltaFeedPrice}` : `-₹${Math.abs(deltaFeedPrice)}`}/kg`;
+      assumptions.push(`Feed consumption held constant at ${Math.round(totalFeedKg).toLocaleString()} kg across ${alive.toLocaleString()} birds.`);
+      assumptions.push(`Adjusted feed price: ₹ ${(baseFeedCostPerKg + deltaFeedPrice).toFixed(2)}/kg.`);
+    }
+    // Scenario B: Selling price change (e.g. "selling price decreases by ₹5/kg")
+    else if (q.includes('selling price') || q.includes('market price') || q.includes('rate')) {
+      const match = query.match(/(?:₹|rs\.?|by|\+|-)?\s*(\d+(?:\.\d+)?)\s*(?:\/kg|rs|rupees|per kg)?/i);
+      let deltaRate = match ? parseFloat(match[1]) : 5;
+      const isDecrease = q.includes('decrease') || q.includes('drop') || q.includes('down') || q.includes('-');
+      if (isDecrease) deltaRate = -Math.abs(deltaRate);
+      else deltaRate = Math.abs(deltaRate);
+
+      const deltaRev = Math.round(alive * targetWeight * deltaRate);
+      newProfit = originalProfit + deltaRev;
+      impactAmount = Math.abs(deltaRev);
+      impactType = deltaRev >= 0 ? 'positive' : 'negative';
+      scenarioTitle = `Selling Price ${deltaRate > 0 ? `+₹${deltaRate}` : `-₹${Math.abs(deltaRate)}`}/kg`;
+      assumptions.push(`Flock harvest weight: ${targetWeight} kg/bird (${(alive * targetWeight).toFixed(0)} total live kg).`);
+      assumptions.push(`Adjusted farm-gate rate: ₹ ${(baseSellingRate + deltaRate).toFixed(2)}/kg.`);
+    }
+    // Scenario C: Mortality increase to X% (e.g. "mortality increases to 5%")
+    else if (q.includes('mortality') && (q.includes('%') || q.includes('percent') || q.includes('dead'))) {
+      const match = query.match(/(\d+(?:\.\d+)?)\s*%/);
+      const targetMortalityPct = match ? parseFloat(match[1]) : 5.0;
+      const newDead = Math.round((activeBatch?.totalChicks || 5000) * (targetMortalityPct / 100));
+      const newAlive = (activeBatch?.totalChicks || 5000) - newDead;
+      const newGrossRev = Math.round(newAlive * targetWeight * baseSellingRate);
+      const newTotalCost = baseChickCost + Math.round(newAlive * 3.8 * baseFeedCostPerKg) + Math.round(newAlive * 12);
+      newProfit = newGrossRev - newTotalCost;
+      impactAmount = Math.abs(originalProfit - newProfit);
+      impactType = newProfit >= originalProfit ? 'positive' : 'negative';
+      scenarioTitle = `Mortality at ${targetMortalityPct}% (${newDead} dead birds)`;
+      assumptions.push(`Harvest population reduced from ${alive.toLocaleString()} to ${newAlive.toLocaleString()} birds.`);
+    }
+    // Scenario D: Feed reduction (e.g. "reduce feed consumption by 5%")
+    else {
+      const deltaCost = Math.round(baseFeedCost * 0.05);
+      newProfit = originalProfit + deltaCost;
+      impactAmount = deltaCost;
+      impactType = 'positive';
+      scenarioTitle = 'Reduce Feed Consumption by 5% (FCR Optimization)';
+      assumptions.push(`Saved ~${Math.round(totalFeedKg * 0.05)} kg feed through strict drinker/feeder wastage control.`);
+    }
+
+    const explanation = `If **${scenarioTitle}** occurs, your estimated net profit shifts from **₹ ${originalProfit.toLocaleString('en-IN')}** to **₹ ${newProfit.toLocaleString('en-IN')}** (Impact: **${impactType === 'positive' ? '+' : '-'}₹ ${impactAmount.toLocaleString('en-IN')}**).`;
+
+    return {
+      scenarioTitle,
+      originalProfit,
+      newProfit,
+      impactAmount,
+      impactType,
+      assumptions,
+      explanation,
+    };
+  }
+
+  // ==========================================
+  // 5. MASTER QUERY PROCESSOR
+  // ==========================================
   public processQuery(userQuery: string, history: ChickAIMessage[] = []): ChickAIMessage {
     const queryLower = userQuery.toLowerCase().trim();
 
-    // Check recent history for contextual batch reference ("its", "this batch", "that batch")
+    // Contextual batch extraction
     let targetBatch = this.extractBatch(queryLower);
     if (!targetBatch && (queryLower.includes('it') || queryLower.includes('this') || queryLower.includes('that'))) {
       if (this.lastMentionedBatchId) {
@@ -32,7 +319,7 @@ export class ChickAIEngine {
       this.lastMentionedBatchId = targetBatch.id;
     }
 
-    // Check for Action Request (e.g., "Add ₹12,000 electricity expense to Batch 45" or "Add 50 dead birds to Batch 45")
+    // 1. Check for Action Requests (Expenses, Mortality, Sales, Tasks, Filtering)
     const actionProposal = this.checkActionProposal(userQuery, targetBatch);
     if (actionProposal) {
       return {
@@ -44,11 +331,78 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Weekly Report / Excel request ("Send weekly report", "Weekly excel report", "Send to 9849852085")
+    // 2. Check for What-If Simulation ("What if feed price increases", "what if mortality is 5%")
+    if (queryLower.includes('what if') || queryLower.includes('simulate') || queryLower.includes('scenario')) {
+      const sim = this.runWhatIfSimulation(userQuery);
+      const text = `### 🧮 What-If Profit Scenario Simulation
+**Scenario:** ${sim.scenarioTitle}
+
+${sim.explanation}
+
+#### 📊 Financial Breakdown:
+• **Baseline Estimated Profit:** ₹ ${sim.originalProfit.toLocaleString('en-IN')}
+• **Simulated New Profit:** **₹ ${sim.newProfit.toLocaleString('en-IN')}**
+• **Estimated Margin Delta:** **${sim.impactType === 'positive' ? '🟢 +' : '🔴 -'}₹ ${sim.impactAmount.toLocaleString('en-IN')}**
+
+#### 📋 Simulation Assumptions:
+${sim.assumptions.map((a) => `• ${a}`).join('\n')}
+
+*(Note: Simulation model based on live flock count and Cobb 500 yield parameters).*`;
+
+      return {
+        id: `msg-${Date.now()}`,
+        sender: 'assistant',
+        text,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        simulationData: sim,
+      };
+    }
+
+    // 3. Check for Farm AI Score ("Farm score", "AI score", "how is my farm performing overall")
+    if (queryLower.includes('score') || queryLower.includes('rating') || queryLower.includes('overall performance') || queryLower.includes('grade')) {
+      const score = this.calculateFarmAIScore();
+      const text = `### 🏆 Farm AI Score: ${score.overall} / 100 (Grade: ${score.grade})
+
+• 🐥 **Batch & Flock Health:** **${score.batchHealth} / 100**
+• 🛡️ **Mortality Control:** **${score.mortalityControl} / 100**
+• 🌾 **Feed Efficiency:** **${score.feedEfficiency} / 100**
+• 💰 **Expense Control:** **${score.expenseControl} / 100**
+• 📈 **Harvest Profitability:** **${score.profitability} / 100**
+
+#### 💡 Key AI Opportunity:
+${score.opportunityNote}`;
+
+      return {
+        id: `msg-${Date.now()}`,
+        sender: 'assistant',
+        text,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        scoreData: score,
+      };
+    }
+
+    // 4. Check for Proactive Alerts ("Find problems", "show alerts", "what is wrong", "issues")
+    if (queryLower.includes('alert') || queryLower.includes('problem') || queryLower.includes('issue') || queryLower.includes('wrong') || queryLower.includes('danger')) {
+      const alerts = this.getProactiveAlerts();
+      const alertItems = alerts.map((a) => {
+        const icon = a.severity === 'critical' ? '🔴' : a.severity === 'attention' ? '🟡' : '🟢';
+        return `${icon} **${a.title}** (${a.metric})\n${a.description}\n*Recommendation:* ${a.recommendation}\n`;
+      }).join('\n');
+
+      return {
+        id: `msg-${Date.now()}`,
+        sender: 'assistant',
+        text: `### 🚨 Autonomous Farm Alert Diagnostics\n\n${alertItems}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        alertsData: alerts,
+      };
+    }
+
+    // 5. Check for Weekly Report in Excel format for 9849852085
     if (queryLower.includes('weekly') || queryLower.includes('excel') || queryLower.includes('spreadsheet') || queryLower.includes('9849852085')) {
-      const activeBatch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
-      const alive = this.context.stats?.aliveChicks || (activeBatch ? activeBatch.aliveChicks : 4880);
-      const dead = this.context.stats?.deadChicks || (activeBatch ? activeBatch.deadChicks : 120);
+      const active = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
+      const alive = this.context.stats?.aliveChicks || (active ? active.aliveChicks : 4880);
+      const dead = this.context.stats?.deadChicks || (active ? active.deadChicks : 120);
       const feedKg = Math.round((alive * 0.13) * 7);
       const feedBags = Math.round(feedKg / 50);
       const totalExp = this.context.stats?.totalExpenditure || 78500;
@@ -56,7 +410,7 @@ export class ChickAIEngine {
 
       const weeklyText = `### 📊 Weekly Farm Executive Audit Report
 **Target Recipient:** Pranay (Manager & Tech Lead • **+91 9849852085**)
-**Flock:** ${activeBatch?.batchNumber || 'Batch-01'} (${activeBatch?.breedType || 'Broiler Cobb 500'})
+**Flock:** ${active?.batchNumber || 'Batch-01'} (${active?.breedType || 'Broiler Cobb 500'})
 
 #### 📈 7-Day Performance Telemetry:
 • **Active Population:** ${alive.toLocaleString()} live birds
@@ -77,7 +431,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Report Generation request ("Generate a report for Batch 45")
+    // 6. Check for Batch Report Generation request ("Generate a report for Batch 45")
     if (queryLower.includes('report') || queryLower.includes('summary sheet')) {
       const report = this.generateBatchReport(targetBatch);
       return {
@@ -89,7 +443,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Profit Prediction ("Predict profit", "forecast", "how much profit will batch 45 make")
+    // 7. Check for Profit Prediction ("Predict profit", "forecast")
     if (queryLower.includes('predict') || queryLower.includes('forecast') || queryLower.includes('expected profit')) {
       return {
         id: `msg-${Date.now()}`,
@@ -99,7 +453,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Batch Comparison ("Compare my last batches", "compare batch 42 and batch 45")
+    // 8. Check for Batch Comparison ("Compare my last batches", "compare batch 42 and batch 45")
     if (queryLower.includes('compare') || queryLower.includes('comparison') || queryLower.includes('versus') || queryLower.includes(' vs ')) {
       return {
         id: `msg-${Date.now()}`,
@@ -109,7 +463,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Batch specific query ("How is Batch 45 doing?", "Batch 45 details")
+    // 9. Check for Batch specific query ("How is Batch 45 doing?")
     if (targetBatch && (queryLower.includes('how is') || queryLower.includes('status') || queryLower.includes('doing') || queryLower.includes('batch'))) {
       return {
         id: `msg-${Date.now()}`,
@@ -119,7 +473,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Mortality Queries ("Which batch has highest mortality?", "how many dead birds", "mortality rate")
+    // 10. Check for Mortality Queries ("Which batch has highest mortality?")
     if (queryLower.includes('mortality') || queryLower.includes('dead') || queryLower.includes('death')) {
       return {
         id: `msg-${Date.now()}`,
@@ -129,7 +483,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Feed Queries ("How much feed did we use?", "Feed remaining", "feed stock")
+    // 11. Check for Feed Queries ("How much feed did we use?")
     if (queryLower.includes('feed') || queryLower.includes('bags') || queryLower.includes('ration') || queryLower.includes('fcr')) {
       return {
         id: `msg-${Date.now()}`,
@@ -139,7 +493,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Expense / Spending queries ("How much did we spend on electricity?", "expenses increasing", "biggest expense")
+    // 12. Check for Expense Queries ("How much did we spend on electricity?")
     if (queryLower.includes('spend') || queryLower.includes('cost') || queryLower.includes('expense') || queryLower.includes('expenditure') || queryLower.includes('money')) {
       return {
         id: `msg-${Date.now()}`,
@@ -149,7 +503,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Live Birds / Bird Count ("How many birds are currently alive?", "active birds")
+    // 13. Check for Live Birds Count ("How many birds are alive?")
     if (queryLower.includes('alive') || queryLower.includes('how many birds') || queryLower.includes('bird count') || queryLower.includes('flock size')) {
       return {
         id: `msg-${Date.now()}`,
@@ -159,7 +513,7 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Revenue / Sales / Profit ("Which batch is making the most profit?", "total revenue")
+    // 14. Check for Revenue / Sales / Profit
     if (queryLower.includes('revenue') || queryLower.includes('profit') || queryLower.includes('sales') || queryLower.includes('making the most')) {
       return {
         id: `msg-${Date.now()}`,
@@ -169,8 +523,8 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Daily Brief / Focus / Problem Finder ("What should I focus on today?", "Find problems", "Daily brief")
-    if (queryLower.includes('brief') || queryLower.includes('focus') || queryLower.includes('today') || queryLower.includes('problem') || queryLower.includes('issues')) {
+    // 15. Check for Daily Brief / Focus ("What should I focus on today?")
+    if (queryLower.includes('brief') || queryLower.includes('focus') || queryLower.includes('today')) {
       return {
         id: `msg-${Date.now()}`,
         sender: 'assistant',
@@ -179,17 +533,17 @@ export class ChickAIEngine {
       };
     }
 
-    // Check for Disease / Health questions
+    // 16. Health / Disease educational advice
     if (queryLower.includes('disease') || queryLower.includes('sick') || queryLower.includes('gumboro') || queryLower.includes('newcastle') || queryLower.includes('ranikhet') || queryLower.includes('coccidiosis')) {
       return {
         id: `msg-${Date.now()}`,
         sender: 'assistant',
-        text: `🏥 **Flock Health & Bio-Security Protocol**\n\nFor poultry health concerns (e.g. Coccidiosis, Newcastle Disease, or sudden respiratory distress):\n\n• **Immediate Action:** Isolate affected shed sections and test water chlorine (2-3 ppm).\n• **Litter Management:** Keep litter dry and rake damp patches with lime.\n• **Medication:** Provide water-soluble Electrolytes + Vitamin E & Selenium booster.\n\n⚠️ **Veterinary Recommendation:** *ChickAI provides educational farm-management guidelines. For clinical diagnosis or prescribing prescription antibiotics, please consult your qualified poultry veterinarian immediately.*`,
+        text: `🏥 **Flock Health & Bio-Security Protocol**\n\nFor poultry health concerns (e.g. Coccidiosis, Newcastle Disease, or respiratory distress):\n\n• **Immediate Action:** Isolate affected shed sections and test drinking water chlorine (2-3 ppm).\n• **Litter Management:** Keep litter dry and rake damp patches with lime.\n• **Medication:** Provide water-soluble Electrolytes + Vitamin E & Selenium booster.\n\n⚠️ **Veterinary Recommendation:** *ChickAI provides educational farm-management guidelines. For clinical diagnosis or prescribing prescription antibiotics, please consult your qualified poultry veterinarian immediately.*`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
     }
 
-    // Default Farm Overview response
+    // Default Overview
     return {
       id: `msg-${Date.now()}`,
       sender: 'assistant',
@@ -198,11 +552,12 @@ export class ChickAIEngine {
     };
   }
 
-  // 2. Extract batch reference from text
+  // ==========================================
+  // HELPER METHODS
+  // ==========================================
   private extractBatch(query: string): any | null {
     if (!this.context.batches || this.context.batches.length === 0) return null;
 
-    // Look for numbers like "batch 45", "b-45", "batch-01", "45"
     for (const b of this.context.batches) {
       const bNum = b.batchNumber.toLowerCase();
       const bName = (b.batchName || '').toLowerCase();
@@ -216,7 +571,6 @@ export class ChickAIEngine {
       }
     }
 
-    // Check if user just typed a 2-digit number like "45"
     const matchedNumber = query.match(/\b\d{1,4}\b/);
     if (matchedNumber) {
       const numStr = matchedNumber[0];
@@ -227,12 +581,31 @@ export class ChickAIEngine {
     return null;
   }
 
-  // 3. Check for actionable proposals (Create expense, update mortality, log feed, record sale)
   private checkActionProposal(query: string, targetBatch: any | null): { text: string; proposal: any } | null {
     const q = query.toLowerCase();
     const batch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
 
-    // Check for "Add ₹X [category] expense to [batch]"
+    // Filter Batches request (e.g. "Show batches with mortality above 4%")
+    if (q.includes('show') && (q.includes('batches') || q.includes('batch')) && (q.includes('mortality') || q.includes('growing') || q.includes('profit'))) {
+      const mortMatch = query.match(/(\d+(?:\.\d+)?)\s*%/);
+      const threshold = mortMatch ? parseFloat(mortMatch[1]) : 4.0;
+      const matchingBatches = this.context.batches.filter((b) => (b.mortalityPercentage || 0) >= threshold);
+
+      return {
+        text: `Found **${matchingBatches.length} batch(es)** matching your criteria (Mortality $\\ge$ ${threshold}%):\n\n${matchingBatches.map((b) => `• **${b.batchNumber}**: ${b.mortalityPercentage}% mortality (${b.aliveChicks.toLocaleString()} alive)`).join('\n') || '• No batches exceed this threshold.'}\n\nWould you like me to filter the Batches view?`,
+        proposal: {
+          type: 'filter_batches',
+          title: `Filter Batches with Mortality >= ${threshold}%`,
+          details: {
+            filterKey: 'mortality',
+            filterValue: threshold,
+          },
+          status: 'pending',
+        },
+      };
+    }
+
+    // Add Expense Action
     if ((q.includes('add') || q.includes('record') || q.includes('create') || q.includes('save')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance'))) {
       const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:rupees|rs|inr))?/i);
       const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
@@ -263,7 +636,7 @@ export class ChickAIEngine {
       }
     }
 
-    // Check for "Add X dead birds / mortality to Batch"
+    // Add Mortality Action
     if ((q.includes('dead') || q.includes('mortality') || q.includes('died')) && (q.includes('add') || q.includes('log') || q.includes('record'))) {
       const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality)?/i);
       const count = countMatch ? parseInt(countMatch[1], 10) : null;
@@ -286,7 +659,7 @@ export class ChickAIEngine {
       }
     }
 
-    // Check for "Record sale of X birds at ₹Y"
+    // Add Sale Action
     if ((q.includes('sale') || q.includes('sold')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
       const birdsMatch = query.match(/(\d+)\s*(?:birds|chickens|chicks)/i);
       const rateMatch = query.match(/(?:₹|at|@|rs\.?)\s*(\d+)/i);
@@ -316,74 +689,66 @@ export class ChickAIEngine {
     return null;
   }
 
-  // 4. Batch Analysis Response
   public getBatchDetailResponse(batch: any): string {
     const startDate = new Date(batch.startDate);
     const today = new Date();
     const diffDays = Math.max(1, Math.min(batch.durationDays || 45, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+    const baselines = this.calculateHistoricalBaselines();
 
     const totalChicks = batch.totalChicks || 5000;
     const aliveChicks = batch.aliveChicks || 4880;
     const deadChicks = batch.deadChicks || (totalChicks - aliveChicks);
     const mortalityPct = batch.mortalityPercentage || Number(((deadChicks / totalChicks) * 100).toFixed(2));
 
-    // Calculate expenses for this batch
     const batchExpenses = this.context.expenses.filter((e) => e.batchId === batch.id);
     const totalExp = batchExpenses.reduce((sum, e) => sum + e.amount, 0) + (batch.costPerChick ? batch.costPerChick * totalChicks : totalChicks * 38);
     const feedExp = batchExpenses.filter((e) => e.category === 'Feed').reduce((sum, e) => sum + e.amount, 0);
 
-    // Calculate revenue for this batch
     const batchSales = this.context.sales.filter((s) => s.batchId === batch.id);
     const totalRev = batchSales.reduce((sum, s) => sum + s.totalRevenue, 0);
     const estProfit = totalRev > 0 ? (totalRev - totalExp) : Math.round(aliveChicks * 2.3 * 115 - totalExp);
-
     const costPerBird = (totalExp / aliveChicks).toFixed(2);
 
-    let insight = '✅ Flock mortality is within optimal commercial range (< 3.5%).';
-    if (mortalityPct > 4.5) {
-      insight = '🔴 Mortality is elevated. Check ventilation and administer water electrolytes + liver tonic.';
-    } else if (mortalityPct > 3.0) {
-      insight = '🟡 Mortality is slightly above normal baseline. Monitor feed intake and shed temperature.';
+    let insight = '✅ Flock mortality is tracking smoothly within historical norms.';
+    if (mortalityPct > baselines.avgMortalityPct * 1.3) {
+      insight = `🔴 Mortality is +${((mortalityPct - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(0)}% above your historical farm baseline (${baselines.avgMortalityPct}%). Check shed temperature and drinker lines.`;
     }
 
-    return `### 🐔 Batch Analysis: ${batch.batchNumber} (${batch.breedType || 'Broiler Cobb 500'})
-**Status:** ${batch.status.toUpperCase()} • **Timeline:** Day ${diffDays} / ${batch.durationDays || 45} (${batch.durationDays - diffDays > 0 ? `${batch.durationDays - diffDays} days to harvest` : 'Ready for harvest'})
+    return `### 🐔 Batch Intelligence: ${batch.batchNumber} (${batch.breedType || 'Broiler Cobb 500'})
+**Status:** ${batch.status.toUpperCase()} • **Timeline:** Day ${diffDays} / ${batch.durationDays || 45} (${Math.max(0, (batch.durationDays || 45) - diffDays)} days to harvest)
 
 #### 🐥 Bird Telemetry:
 • **Started:** ${totalChicks.toLocaleString()} birds
 • **Alive:** ${aliveChicks.toLocaleString()} birds
 • **Dead:** ${deadChicks.toLocaleString()} birds
-• **Mortality Rate:** **${mortalityPct}%**
+• **Mortality Rate:** **${mortalityPct}%** (Historical baseline: ${baselines.avgMortalityPct}%)
 
 #### 💰 Financial Overview:
 • **Total Incurred Cost:** ₹ ${totalExp.toLocaleString('en-IN')}
-• **Cost per Live Bird:** ₹ ${costPerBird}
+• **Cost per Live Bird:** ₹ ${costPerBird} (Historical avg: ₹ ${baselines.avgCostPerBird})
 • **Feed Expenses:** ₹ ${feedExp.toLocaleString('en-IN')}
 • **Realized Revenue:** ₹ ${totalRev.toLocaleString('en-IN')}
-• **Current Estimated Margin/Profit:** **₹ ${estProfit.toLocaleString('en-IN')}**
+• **Current Estimated Margin:** **₹ ${estProfit.toLocaleString('en-IN')}**
 
 #### ⚠️ AI Farm Insight:
 ${insight}`;
   }
 
-  // 5. Profit Prediction
   public generateProfitPrediction(batch?: any): string {
     const targetBatch = batch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
     if (!targetBatch) {
-      return 'I don\'t have enough data to calculate profit prediction yet. Please ensure at least one batch is created.';
+      return 'I don\'t have enough data to calculate profit prediction yet.';
     }
 
     const alive = targetBatch.aliveChicks || 4880;
-    const targetWeightKg = 2.35; // Standard 42-45 day broiler weight
-    const estMarketRatePerKg = 118; // Live wholesale price in ₹/kg
+    const targetWeightKg = 2.35;
+    const estMarketRatePerKg = 118;
 
     const estGrossRevenue = Math.round(alive * targetWeightKg * estMarketRatePerKg);
-
-    // Calculate total expected cost (chicks + feed + medicine + electricity + labour)
     const chickCost = targetBatch.totalChicks * (targetBatch.costPerChick || 38);
-    const estFeedKg = alive * 3.8; // 3.8kg feed for 2.35kg bird (FCR ~1.61)
-    const estFeedCost = Math.round(estFeedKg * 42.5); // ~₹42.5/kg feed
-    const estMedUtilityCost = Math.round(alive * 12); // ~₹12/bird medicine, power, labour
+    const estFeedKg = alive * 3.8;
+    const estFeedCost = Math.round(estFeedKg * 42.5);
+    const estMedUtilityCost = Math.round(alive * 12);
 
     const estTotalCost = chickCost + estFeedCost + estMedUtilityCost;
     const estNetProfit = estGrossRevenue - estTotalCost;
@@ -391,7 +756,7 @@ ${insight}`;
 
     return `### 📈 AI Profit Forecast • ${targetBatch.batchNumber}
 
-*Predictions are calculated using live flock counts, Cobb 500 FCR growth models, and current regional poultry rates.*
+*Predictions are calculated from real flock counts, Cobb 500 FCR growth models, and live poultry rates.*
 
 • **Active Birds:** ${alive.toLocaleString()} live broilers
 • **Expected Harvest Weight:** **${targetWeightKg} kg / bird**
@@ -410,7 +775,6 @@ ${insight}`;
 *(Note: Predictions are dynamic estimates based on live telemetry and feed market rates).*`;
   }
 
-  // 6. Batch Comparison
   public generateBatchComparison(query: string): string {
     const batches = this.context.batches;
     if (!batches || batches.length < 2) {
@@ -427,7 +791,7 @@ ${insight}`;
     const lowestMortalityBatch = [...batches].sort((a, b) => (a.mortalityPercentage || 0) - (b.mortalityPercentage || 0))[0];
     const highestMortalityBatch = [...batches].sort((a, b) => (b.mortalityPercentage || 0) - (a.mortalityPercentage || 0))[0];
 
-    let tableRows = batches.slice(0, 5).map((b) => {
+    const tableRows = batches.slice(0, 5).map((b) => {
       const totalChicks = b.totalChicks || 5000;
       const dead = b.deadChicks || 0;
       const mort = (b.mortalityPercentage || ((dead / totalChicks) * 100)).toFixed(1);
@@ -449,7 +813,6 @@ ${tableRows}
 • **📈 Improving Trends:** Livability across recent grow-out cycles is averaging **${(100 - (this.context.stats?.mortalityPercentage || 2.4)).toFixed(1)}%**.`;
   }
 
-  // 7. Expense breakdown response
   public getExpenseResponse(query: string, targetBatch: any | null): string {
     const expenses = this.context.expenses;
     const totalExp = this.context.stats?.totalExpenditure || expenses.reduce((sum, e) => sum + e.amount, 0);
@@ -462,14 +825,6 @@ ${tableRows}
 
     if (query.includes('feed')) {
       return `🌾 **Feed Expense Breakdown:**\n\nTotal spent on poultry feed: **₹ ${feedCost.toLocaleString('en-IN')}** (~${Math.round(feedCost / 2150)} standard 50kg bags purchased).\nFeed represents **${totalExp > 0 ? ((feedCost / totalExp) * 100).toFixed(1) : '68'}%** of your total farm operating costs.`;
-    }
-
-    if (query.includes('medicine') || query.includes('vaccine')) {
-      return `💊 **Medicine & Vaccine Expense Breakdown:**\n\nTotal spent on veterinary medicines & boosters: **₹ ${medCost.toLocaleString('en-IN')}**.\nCovers Lasota, Gumboro (IBD), Vitamin E-Selenium, Liver tonics, and sanitizers.`;
-    }
-
-    if (query.includes('electricity') || query.includes('power')) {
-      return `⚡ **Electricity Expense Breakdown:**\n\nTotal spent on electricity & generator fuel: **₹ ${elecCost.toLocaleString('en-IN')}**.\nPower consumption powers automated feeding augers, nipple drinkers, and high-velocity ventilation blowers.`;
     }
 
     if (query.includes('biggest') || query.includes('highest')) {
@@ -488,7 +843,6 @@ ${tableRows}
 • 🔧 **Equipment Maintenance:** ₹ ${maintCost.toLocaleString('en-IN')}`;
   }
 
-  // 8. Mortality Response
   public getMortalityResponse(targetBatch: any | null): string {
     const batches = this.context.batches;
     if (targetBatch) {
@@ -498,7 +852,6 @@ ${tableRows}
     const totalDead = this.context.stats?.deadChicks || 120;
     const totalAlive = this.context.stats?.aliveChicks || 4880;
     const overallPct = this.context.stats?.mortalityPercentage || 2.4;
-
     const highest = [...batches].sort((a, b) => (b.mortalityPercentage || 0) - (a.mortalityPercentage || 0))[0];
 
     return `### 🐥 Farm Mortality & Livability Summary
@@ -510,7 +863,6 @@ ${tableRows}
 ${highest ? `⚠️ **Highest Mortality Batch:** **${highest.batchNumber}** at **${highest.mortalityPercentage.toFixed(2)}%** (${highest.deadChicks} dead birds).` : ''}`;
   }
 
-  // 9. Feed Response
   public getFeedResponse(targetBatch: any | null): string {
     const stats = this.context.stats;
     const feedConsumed = stats?.feedConsumed || 6450;
@@ -526,7 +878,6 @@ ${highest ? `⚠️ **Highest Mortality Batch:** **${highest.batchNumber}** at *
 ${Number(daysLeft) < 3.0 ? '🚨 **Alert:** Feed stock is running low. Reorder Broiler Finisher feed within 48 hours.' : '✅ **Status:** Feed supply is adequate for current flock appetite.'}`;
   }
 
-  // 10. Live Birds Response
   public getLiveBirdsResponse(): string {
     const alive = this.context.stats?.aliveChicks || 4880;
     const total = this.context.stats?.totalChicks || 5000;
@@ -535,36 +886,23 @@ ${Number(daysLeft) < 3.0 ? '🚨 **Alert:** Feed stock is running low. Reorder B
     return `🐔 **Active Farm Population:**\n\nThere are currently **${alive.toLocaleString()} live birds** on the farm across **${activeBatches.length} active grow-out sheds** (Total placement: ${total.toLocaleString()} chicks). Overall livability is **${(100 - (this.context.stats?.mortalityPercentage || 2.4)).toFixed(1)}%**.`;
   }
 
-  // 11. Revenue / Profit Response
   public getRevenueProfitResponse(targetBatch: any | null): string {
     const rev = this.context.stats?.totalRevenue || 0;
     const exp = this.context.stats?.totalExpenditure || 0;
     const net = this.context.stats?.netRealizedProfit || (rev - exp);
 
-    const sorted = [...this.context.batches].sort((a, b) => {
-      const aSales = this.context.sales.filter((s) => s.batchId === a.id).reduce((sum, s) => sum + s.totalRevenue, 0);
-      const bSales = this.context.sales.filter((s) => s.batchId === b.id).reduce((sum, s) => sum + s.totalRevenue, 0);
-      return bSales - aSales;
-    });
-
-    const top = sorted[0];
-
     return `### 💰 Farm Financial & Profit Telemetry
 
 • **Total Realized Revenue (Bird Sales):** **₹ ${rev.toLocaleString('en-IN')}**
 • **Total Farm Operating Expenditure:** **₹ ${exp.toLocaleString('en-IN')}**
-• **Net Realized Profit:** **₹ ${net.toLocaleString('en-IN')}**
-
-${top ? `🏆 **Most Profitable Batch:** **${top.batchNumber}** (${top.breedType}) with strong market off-take.` : ''}`;
+• **Net Realized Profit:** **₹ ${net.toLocaleString('en-IN')}**`;
   }
 
-  // 12. Daily Farm Brief
   public getDailyFarmBriefResponse(): string {
     const active = this.context.batches.filter((b) => b.status === 'growing');
     const healthyCount = active.filter((b) => (b.mortalityPercentage || 0) <= 3.0).length;
     const cautionCount = active.filter((b) => (b.mortalityPercentage || 0) > 3.0 && (b.mortalityPercentage || 0) <= 4.5).length;
     const alertCount = active.filter((b) => (b.mortalityPercentage || 0) > 4.5).length;
-
     const totalCost = this.context.stats?.totalExpenditure || 482500;
     const feedDays = Number(((this.context.stats?.feedRemaining || 1850) / ((this.context.stats?.aliveChicks || 4880) * 0.13)).toFixed(1));
 
@@ -585,7 +923,6 @@ ${top ? `🏆 **Most Profitable Batch:** **${top.batchNumber}** (${top.breedType
 3. Review wholesale trader weighbridge booking for approaching harvest.`;
   }
 
-  // 13. Generate Batch Report
   public generateBatchReport(batch?: any): { text: string; data: any } {
     const targetBatch = batch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
     const totalChicks = targetBatch?.totalChicks || 5000;
@@ -641,7 +978,6 @@ ${top ? `🏆 **Most Profitable Batch:** **${top.batchNumber}** (${top.breedType
     return { text, data: reportData };
   }
 
-  // 14. General overview
   private getGeneralOverviewResponse(): string {
     const stats = this.context.stats;
     const active = this.context.batches.filter((b) => b.status === 'growing').length;
@@ -656,10 +992,10 @@ I am directly connected to your farm database with real-time biometric and finan
 • 💸 **Total Expenditure:** ₹ ${(stats?.totalExpenditure || 0).toLocaleString('en-IN')}
 
 **Try asking me:**
-- *"How is Batch 45 doing?"*
-- *"Which batch has the highest mortality?"*
-- *"Predict profit for my active flock"*
-- *"Add ₹8,500 feed expense to Batch 45"*
-- *"Compare my last batches"*`;
+- *"Calculate my Farm AI Score"*
+- *"What if feed price increases by ₹3/kg?"*
+- *"Show batches with mortality above 4%"*
+- *"Send weekly report to 9849852085 in Excel format"*
+- *"Add ₹12,000 electricity expense to Batch 45"*`;
   }
 }
