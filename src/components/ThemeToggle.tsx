@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import React from 'react';
 import { Sun, Moon, Sparkles } from 'lucide-react';
@@ -10,34 +10,40 @@ export default function ThemeToggle() {
   const themes = [
     { id: 'light', icon: Sun, label: 'Light' },
     { id: 'dark', icon: Moon, label: 'Dark' },
-    { id: 'obsidian', icon: Sparkles, label: 'Obsidian' }
+    { id: 'liquid', icon: Sparkles, label: 'Liquid' },
   ];
 
   return (
-    <div className={`flex items-center p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-full ${!sidebarOpen ? 'flex-col gap-2' : 'gap-1'}`}>
+    <div
+      className={`flex items-center p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl ${
+        !sidebarOpen ? 'flex-col gap-1' : 'gap-1 w-full justify-between'
+      }`}
+    >
       {themes.map((t) => {
-        const isActive = theme === t.id;
-        let activeStyles = 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]';
-        
-        if (isActive) {
-          if (t.id === 'light') activeStyles = 'bg-amber-100 text-amber-600 shadow-sm';
-          else if (t.id === 'dark') activeStyles = 'bg-emerald-900 text-emerald-400 shadow-sm';
-          else if (t.id === 'obsidian') activeStyles = 'bg-violet-500/20 text-violet-400 shadow-sm';
-        }
+        const isActive =
+          theme === t.id ||
+          (t.id === 'liquid' && (theme === 'obsidian' || theme === 'liquid-glass'));
+        const Icon = t.icon;
 
         return (
           <button
             key={t.id}
             onClick={() => setTheme(t.id as any)}
-            className={`p-2 rounded-full transition-all duration-200 relative group ${activeStyles}`}
+            className={`flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all ${
+              sidebarOpen ? 'flex-1' : 'p-2.5'
+            } ${
+              isActive
+                ? t.id === 'light'
+                  ? 'bg-white text-amber-600 shadow-sm border border-amber-200'
+                  : t.id === 'dark'
+                  ? 'bg-[#15271F] text-emerald-400 shadow-sm border border-[#1C382B]'
+                  : 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
+                : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]'
+            }`}
             title={t.label}
           >
-            <t.icon className="w-4 h-4" />
-            <span className="sr-only">{t.label}</span>
-            {/* Tooltip */}
-            <div className={`absolute ${sidebarOpen ? '-top-10 left-1/2 -translate-x-1/2' : 'left-full ml-2 top-1/2 -translate-y-1/2'} px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50`}>
-              {t.label}
-            </div>
+            <Icon className="w-4 h-4" />
+            {sidebarOpen && <span className="text-[12px] truncate">{t.label}</span>}
           </button>
         );
       })}

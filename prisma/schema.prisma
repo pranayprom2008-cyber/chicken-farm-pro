@@ -1,0 +1,194 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Farm {
+  id        String   @id @default(cuid())
+  farmName  String   @default("GreenField Poultry Farm")
+  location  String   @default("Hyderabad, India")
+  ownerName String   @default("John Doe")
+  phone     String   @default("9502828293")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Batch {
+  id              String             @id @default(cuid())
+  batchNumber     String             @unique
+  batchName       String             @default("")
+  breedType       String             @default("Cobb 500 (Broiler)")
+  startDate       DateTime           @default(now())
+  expectedEndDate DateTime
+  actualEndDate   DateTime?
+  durationDays    Int                @default(45)
+  totalChicks     Int                @default(5000)
+  aliveChicks     Int                @default(5000)
+  deadChicks      Int                @default(0)
+  status          String             @default("growing") // "growing", "completed", "sold"
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  dailyRecords    DailyBatchRecord[]
+  expenses        Expense[]
+  feedRecords     Feed[]
+  medicineRecords Medicine[]
+  labourRecords   Labour[]
+  electricityLogs Electricity[]
+  maintenanceLogs Maintenance[]
+  salesRecords    Sales[]
+  billingLogs     BillingCalculation[]
+}
+
+model DailyBatchRecord {
+  id           String   @id @default(cuid())
+  batchId      String
+  batch        Batch    @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  date         DateTime @default(now())
+  aliveChicks  Int
+  deadChicks   Int      @default(0)
+  feedConsumed Float    @default(0) // in kg
+  averageWeight Float   @default(0) // in kg or grams
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  batchId     String?
+  batch       Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  category    String   // "Feed", "Medicine", "Electricity", "Labour", "Maintenance", "Miscellaneous"
+  amount      Float
+  date        DateTime @default(now())
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Feed {
+  id        String   @id @default(cuid())
+  batchId   String?
+  batch     Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  date      DateTime @default(now())
+  quantity  Float    // in kg or bags
+  price     Float    // price per unit
+  totalCost Float
+  supplier  String?  @default("Poultry Feed Co.")
+  notes     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Medicine {
+  id           String   @id @default(cuid())
+  batchId      String?
+  batch        Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  medicineName String
+  quantity     Float    @default(1)
+  cost         Float
+  date         DateTime @default(now())
+  purpose      String?  @default("Vaccination & Health Booster")
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Labour {
+  id           String   @id @default(cuid())
+  batchId      String?
+  batch        Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  employeeName String
+  daysWorked   Float    @default(1)
+  dailyWage    Float
+  totalCost    Float
+  date         DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Electricity {
+  id            String   @id @default(cuid())
+  batchId       String?
+  batch         Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  billDate      DateTime @default(now())
+  unitsConsumed Float    @default(0)
+  amount        Float
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Maintenance {
+  id          String   @id @default(cuid())
+  batchId     String?
+  batch       Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  description String
+  amount      Float
+  date        DateTime @default(now())
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Sales {
+  id           String   @id @default(cuid())
+  batchId      String?
+  batch        Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  chickensSold Int
+  averageWeight Float   // in kg
+  pricePerKg   Float
+  totalRevenue Float
+  saleDate     DateTime @default(now())
+  buyer        String?  @default("Wholesale Poultry Market")
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model BillingCalculation {
+  id             String   @id @default(cuid())
+  batchId        String?
+  batch          Batch?   @relation(fields: [batchId], references: [id], onDelete: SetNull)
+  type           String   @default("chick_purchase") // "chick_purchase", "feed", "fcr", "medicine"
+  chickRate      Float?
+  numberOfChicks Int?
+  feedBags       Float?
+  fcrScore       Float?
+  totalAmount    Float
+  notes          String?
+  date           DateTime @default(now())
+  createdAt      DateTime @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  title     String
+  message   String
+  type      String   @default("info") // "info", "warning", "error", "success"
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+}
+
+model Setting {
+  id        String   @id @default("default-setting")
+  farmName  String   @default("GreenField Poultry Farm")
+  currency  String   @default("₹")
+  language  String   @default("en")
+  theme     String   @default("dark")
+  logoUrl   String?
+  updatedAt DateTime @updatedAt
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  action    String
+  details   String
+  user      String   @default("Admin")
+  createdAt DateTime @default(now())
+}

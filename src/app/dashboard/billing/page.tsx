@@ -1,433 +1,666 @@
-"use client";
-import React, { useState, useEffect } from 'react';
-import { useFarmStore } from '@/store/useFarmStore';
-import { Receipt, CreditCard, AlertCircle, CheckCircle, Plus, Trash2, Edit, X, Calculator, ArrowRight, DollarSign } from 'lucide-react';
+'use client';
 
-interface Invoice {
-  id: string;
-  customerName: string;
-  description: string;
-  amount: number;
-  date: string;
-  dueDate: string;
-  status: 'paid' | 'pending' | 'overdue';
-}
+import React, { useState, useEffect } from 'react';
+import { useFarmStore, BillingRecord } from '@/store/useFarmStore';
+import { motion, AnimatePresence } from 'framer-motion';
+import confetti from 'canvas-confetti';
+import AnimatedCounter from '@/components/AnimatedCounter';
+import {
+  Calculator,
+  Sparkles,
+  Receipt,
+  Plus,
+  Trash2,
+  Calendar,
+  Layers,
+  Activity,
+  CheckCircle,
+  Clock,
+  ArrowRight,
+  Download
+} from 'lucide-react';
+
+import TiltCard from '@/components/TiltCard';
 
 export default function BillingPage() {
-  const { currentPhone, theme, settings } = useFarmStore();
-  const [activeTab, setActiveTab] = useState<'invoices' | 'calculator'>('invoices');
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
-  const [filter, setFilter] = useState<'all' | 'paid' | 'pending' | 'overdue'>('all');
+  const {
+    theme,
+    batches,
+    billingHistory,
+    fetchBillingHistory,
+    createBillingCalculation,
+    deleteBillingCalculation,
+  } = useFarmStore();
 
-  // Calculator State
-  const [birdCount, setBirdCount] = useState(1000);
-  const [chickPrice, setChickPrice] = useState(35);
-  const [feedKgPerBird, setFeedKgPerBird] = useState(3.2);
-  const [feedCostPerKg, setFeedCostPerKg] = useState(42);
-  const [medicinePerBird, setMedicinePerBird] = useState(8);
-  const [otherCostPerBird, setOtherCostPerBird] = useState(5);
-  const [mortalityRate, setMortalityRate] = useState(3.5);
-  const [avgWeightKg, setAvgWeightKg] = useState(2.1);
-  const [sellingPricePerKg, setSellingPricePerKg] = useState(120);
+  // Calculator modes
+  const [calcMode, setCalcMode] = useState<'chick' | 'feed' | 'fcr' | 'medicine'>('chick');
 
-  const isObsidian = theme === 'obsidian';
-  const storageKey = `chickfarm-${currentPhone || 'default'}-billing`;
+  // Chick Purchase Calculator state
+  const [chickRate, setChickRate] = useState<string>('');
+  const [numberOfChicks, setNumberOfChicks] = useState<string>('');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('');
+  const [notes, setNotes] = useState<string>('');
+
+  // Feed Calculator state
+  const [feedBags, setFeedBags] = useState<string>('');
+  const [feedBagPrice, setFeedBagPrice] = useState<string>('');
+
+  // FCR Calculator state
+  const [fcrFeedTotalKg, setFcrFeedTotalKg] = useState<string>('');
+  const [fcrWeightTotalKg, setFcrWeightTotalKg] = useState<string>('');
+
+  // Medicine Dosage state
+  const [medBirds, setMedBirds] = useState<string>('');
+  const [medDosagePerBird, setMedDosagePerBird] = useState<string>('');
+  const [medCostPerLitre, setMedCostPerLitre] = useState<string>('');
+
+  const [saving, setSaving] = useState(false);
+  const [successMsg, setSuccessMsg] = useState('');
+
+  const isLiquid = theme === 'obsidian' || theme === 'liquid-glass' || theme === 'liquid';
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const stored = localStorage.getItem(storageKey);
-      if (stored) {
-        try {
-          setInvoices(JSON.parse(stored));
-        } catch (e) {
-          console.error("Failed to parse billing data");
-        }
-      }
-    }
-  }, [currentPhone, storageKey]);
-
-  const saveInvoices = (newInvoices: Invoice[]) => {
-    setInvoices(newInvoices);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem(storageKey, JSON.stringify(newInvoices));
-    }
-  };
-
-  const handleSaveInvoice = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const newInvoice: Invoice = {
-      id: editingInvoice ? editingInvoice.id : `INV-${Date.now().toString().slice(-6)}`,
-      customerName: formData.get('customerName') as string,
-      description: formData.get('description') as string,
-      amount: Number(formData.get('amount')),
-      date: formData.get('date') as string,
-      dueDate: formData.get('dueDate') as string,
-      status: formData.get('status') as 'paid' | 'pending' | 'overdue',
-    };
-
-    if (editingInvoice) {
-      saveInvoices(invoices.map(inv => inv.id === editingInvoice.id ? newInvoice : inv));
-    } else {
-      saveInvoices([...invoices, newInvoice]);
-    }
-    setIsModalOpen(false);
-    setEditingInvoice(null);
-  };
-
-  const handleDelete = (id: string) => {
-    if (confirm("Are you sure you want to delete this invoice?")) {
-      saveInvoices(invoices.filter(inv => inv.id !== id));
-    }
-  };
+    fetchBillingHistory();
+  }, [fetchBillingHistory]);
 
   // Calculations
-  const birdsAlive = Math.round(birdCount * (1 - mortalityRate / 100));
-  const totalWeightKg = birdsAlive * avgWeightKg;
-  const totalChickCost = birdCount * chickPrice;
-  const totalFeedCost = birdCount * feedKgPerBird * feedCostPerKg;
-  const totalMedCost = birdCount * medicinePerBird;
-  const totalOtherCost = birdCount * otherCostPerBird;
-  const totalProductionCost = totalChickCost + totalFeedCost + totalMedCost + totalOtherCost;
-  const grossRevenueCalc = totalWeightKg * sellingPricePerKg;
-  const netProfitCalc = grossRevenueCalc - totalProductionCost;
-  const costPerKg = totalWeightKg > 0 ? totalProductionCost / totalWeightKg : 0;
-  const profitPerBird = birdsAlive > 0 ? netProfitCalc / birdsAlive : 0;
+  const numChicks = parseFloat(numberOfChicks) || 0;
+  const rateChick = parseFloat(chickRate) || 0;
+  const chickTotalAmount = numChicks * rateChick;
 
-  const totalBilled = invoices.reduce((sum, inv) => sum + inv.amount, 0);
-  const totalPaid = invoices.filter(i => i.status === 'paid').reduce((sum, inv) => sum + inv.amount, 0);
-  const outstandingBalance = invoices.filter(i => i.status === 'pending').reduce((sum, inv) => sum + inv.amount, 0);
-  const overdueAmount = invoices.filter(i => i.status === 'overdue').reduce((sum, inv) => sum + inv.amount, 0);
+  const numFeedBags = parseFloat(feedBags) || 0;
+  const bagPrice = parseFloat(feedBagPrice) || 0;
+  const feedTotalAmount = numFeedBags * bagPrice;
 
-  const filteredInvoices = filter === 'all' ? invoices : invoices.filter(i => i.status === filter);
+  const fcrFeed = parseFloat(fcrFeedTotalKg) || 0;
+  const fcrWeight = parseFloat(fcrWeightTotalKg) || 0;
+  const fcrScore = fcrWeight > 0 ? (fcrFeed / fcrWeight).toFixed(2) : '0.00';
 
-  const cardClass = `rounded-2xl border border-[var(--border-color)] bg-[var(--bg-card)] ${isObsidian ? 'obsidian-glass' : 'shadow-sm'}`;
-  const inputClass = `w-full bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 ${isObsidian ? 'focus:ring-violet-500/50' : 'focus:ring-emerald-500/50'} transition-all`;
-  const btnPrimary = `px-4 py-2.5 text-white flex items-center gap-2 transition-all duration-200 rounded-xl text-sm font-medium ${
-    isObsidian ? 'bg-gradient-to-r from-violet-600 to-cyan-600 hover:opacity-90' : 'bg-emerald-500 hover:bg-emerald-600'
-  }`;
+  const numMedBirds = parseFloat(medBirds) || 0;
+  const dosageMl = parseFloat(medDosagePerBird) || 0;
+  const costLitre = parseFloat(medCostPerLitre) || 0;
+  const totalMedLitres = (numMedBirds * dosageMl) / 1000;
+  const medTotalAmount = totalMedLitres * costLitre;
+
+  // Active calculated amount
+  let currentTotal = 0;
+  if (calcMode === 'chick') currentTotal = chickTotalAmount;
+  else if (calcMode === 'feed') currentTotal = feedTotalAmount;
+  else if (calcMode === 'fcr') currentTotal = parseFloat(fcrScore) || 0;
+  else if (calcMode === 'medicine') currentTotal = medTotalAmount;
+
+  const triggerCelebration = () => {
+    try {
+      confetti({
+        particleCount: 50,
+        spread: 60,
+        origin: { y: 0.75 },
+        colors: isLiquid ? ['#00E5FF', '#8B5CF6', '#10B981', '#F59E0B'] : ['#10B981', '#34D399', '#FBBF24'],
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handleSaveToHistory = async () => {
+    if (currentTotal <= 0 && calcMode !== 'fcr') return;
+    setSaving(true);
+    setSuccessMsg('');
+
+    let payload: Partial<BillingRecord> = {
+      type:
+        calcMode === 'chick'
+          ? 'chick_purchase'
+          : calcMode === 'feed'
+          ? 'feed_purchase'
+          : calcMode === 'fcr'
+          ? 'fcr_calculation'
+          : 'medicine_calculation',
+      totalAmount: currentTotal,
+      batchId: selectedBatchId || null,
+      notes: notes || undefined,
+    };
+
+    if (calcMode === 'chick') {
+      payload.chickRate = rateChick;
+      payload.numberOfChicks = numChicks;
+      payload.notes = notes || `Chick Purchase: ${numChicks.toLocaleString()} birds @ ₹${rateChick}/unit`;
+    } else if (calcMode === 'feed') {
+      payload.feedBags = numFeedBags;
+      payload.notes = notes || `Feed Purchase: ${numFeedBags} bags @ ₹${bagPrice}/bag`;
+    } else if (calcMode === 'fcr') {
+      payload.fcrScore = parseFloat(fcrScore);
+      payload.notes = notes || `FCR: Feed ${fcrFeed}kg / Weight ${fcrWeight}kg = ${fcrScore}`;
+    } else if (calcMode === 'medicine') {
+      payload.notes = notes || `Medicine: ${totalMedLitres.toFixed(2)}L for ${numMedBirds} birds`;
+    }
+
+    const res = await createBillingCalculation(payload);
+    setSaving(false);
+    if (res.success) {
+      triggerCelebration();
+      setSuccessMsg('Calculation saved to database history!');
+      setTimeout(() => setSuccessMsg(''), 3500);
+      setNotes('');
+    }
+  };
+
+  const exportHistoryCSV = () => {
+    if (!billingHistory || billingHistory.length === 0) return;
+    const headers = ['Type', 'Amount (₹)', 'Date', 'Batch', 'Notes'];
+    const rows = billingHistory.map((item) => [
+      item.type,
+      item.totalAmount,
+      new Date(item.createdAt).toLocaleDateString(),
+      item.batch?.batchNumber || 'General',
+      `"${(item.notes || '').replace(/"/g, '""')}"`,
+    ]);
+    const csvContent =
+      'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `chickfarm_billing_history_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const tabs = [
+    { id: 'chick', label: 'Chick Purchase', icon: '🐣' },
+    { id: 'feed', label: 'Feed Calculator', icon: '🌾' },
+    { id: 'fcr', label: 'FCR Analysis', icon: '⚖️' },
+    { id: 'medicine', label: 'Medicine Dosage', icon: '💊' },
+  ];
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-[var(--text-primary)] flex items-center gap-2">
-            <Receipt className="w-6 h-6" /> Billing & Invoices
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
+            Billing & Farm Calculator
           </h1>
-          <p className="text-[var(--text-secondary)] text-sm mt-0.5">Manage customer billing, invoices and profitability calculations</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="flex bg-[var(--bg-primary)] p-1 rounded-xl border border-[var(--border-color)]">
-            <button
-              onClick={() => setActiveTab('invoices')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === 'invoices' ? (isObsidian ? 'bg-violet-600 text-white' : 'bg-emerald-500 text-white shadow-sm') : 'text-[var(--text-secondary)]'}`}
-            >
-              Invoices
-            </button>
-            <button
-              onClick={() => setActiveTab('calculator')}
-              className={`px-3.5 py-1.5 rounded-lg text-xs font-medium flex items-center gap-1.5 transition-all ${activeTab === 'calculator' ? (isObsidian ? 'bg-violet-600 text-white' : 'bg-emerald-500 text-white shadow-sm') : 'text-[var(--text-secondary)]'}`}
-            >
-              <Calculator className="w-3.5 h-3.5" /> Calculator
-            </button>
-          </div>
-          {activeTab === 'invoices' && (
-            <button
-              onClick={() => { setEditingInvoice(null); setIsModalOpen(true); }}
-              className={btnPrimary}
-            >
-              <Plus className="w-4 h-4" /> Create Invoice
-            </button>
-          )}
+          <p className="text-[var(--text-secondary)] text-sm mt-0.5">
+            Calculate chick purchase costs, feed requirements, and FCR efficiency metrics
+          </p>
         </div>
       </div>
 
-      {activeTab === 'invoices' ? (
-        <>
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div className={`p-5 ${cardClass}`}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-blue-500/10 text-blue-500"><Receipt className="w-5 h-5" /></div>
-                <h3 className="text-sm text-[var(--text-secondary)] font-medium">Total Billed</h3>
-              </div>
-              <p className="text-2xl font-bold text-[var(--text-primary)]">{settings.currency}{totalBilled.toLocaleString()}</p>
-            </div>
-            <div className={`p-5 ${cardClass}`}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-emerald-500/10 text-emerald-500"><CheckCircle className="w-5 h-5" /></div>
-                <h3 className="text-sm text-[var(--text-secondary)] font-medium">Total Paid</h3>
-              </div>
-              <p className="text-2xl font-bold text-emerald-500">{settings.currency}{totalPaid.toLocaleString()}</p>
-            </div>
-            <div className={`p-5 ${cardClass}`}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-amber-500/10 text-amber-500"><CreditCard className="w-5 h-5" /></div>
-                <h3 className="text-sm text-[var(--text-secondary)] font-medium">Outstanding</h3>
-              </div>
-              <p className="text-2xl font-bold text-amber-500">{settings.currency}{outstandingBalance.toLocaleString()}</p>
-            </div>
-            <div className={`p-5 ${cardClass}`}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className="p-2 rounded-lg bg-red-500/10 text-red-500"><AlertCircle className="w-5 h-5" /></div>
-                <h3 className="text-sm text-[var(--text-secondary)] font-medium">Overdue</h3>
-              </div>
-              <p className="text-2xl font-bold text-red-500">{settings.currency}{overdueAmount.toLocaleString()}</p>
-            </div>
-          </div>
-
-          {/* Invoices Table */}
-          <div className={`${cardClass} overflow-hidden`}>
-            <div className="p-4 border-b border-[var(--border-color)] flex justify-between items-center flex-wrap gap-3">
-              <h2 className="text-base font-semibold text-[var(--text-primary)]">Payment History</h2>
-              <select 
-                value={filter} 
-                onChange={(e) => setFilter(e.target.value as any)}
-                className="bg-[var(--bg-primary)] border border-[var(--border-color)] text-[var(--text-primary)] text-sm rounded-xl px-3 py-1.5 focus:outline-none focus:border-emerald-500"
-              >
-                <option value="all">All Invoices</option>
-                <option value="paid">Paid</option>
-                <option value="pending">Pending</option>
-                <option value="overdue">Overdue</option>
-              </select>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-[var(--bg-secondary)] border-b border-[var(--border-color)] text-[var(--text-secondary)] text-xs font-medium">
-                    <th className="p-4">Invoice #</th>
-                    <th className="p-4">Customer Name</th>
-                    <th className="p-4">Amount</th>
-                    <th className="p-4">Date</th>
-                    <th className="p-4">Due Date</th>
-                    <th className="p-4">Status</th>
-                    <th className="p-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border-color)] text-sm">
-                  {filteredInvoices.length === 0 ? (
-                    <tr>
-                      <td colSpan={7} className="p-12 text-center text-[var(--text-muted)]">
-                        <div className="flex flex-col items-center justify-center">
-                          <Receipt className="w-10 h-10 mb-2 opacity-30" />
-                          <p>No invoices recorded yet.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredInvoices.map((inv) => (
-                      <tr key={inv.id} className="hover:bg-[var(--bg-card-hover)] transition-colors">
-                        <td className="p-4 font-mono font-medium text-[var(--text-primary)]">{inv.id}</td>
-                        <td className="p-4 text-[var(--text-secondary)]">
-                          <div className="font-medium text-[var(--text-primary)]">{inv.customerName}</div>
-                          <div className="text-xs text-[var(--text-muted)]">{inv.description}</div>
-                        </td>
-                        <td className="p-4 font-semibold text-[var(--text-primary)]">{settings.currency}{inv.amount.toLocaleString()}</td>
-                        <td className="p-4 text-[var(--text-secondary)]">{inv.date}</td>
-                        <td className="p-4 text-[var(--text-secondary)]">{inv.dueDate}</td>
-                        <td className="p-4">
-                          <span className={`px-2.5 py-1 text-xs font-medium rounded-full ${
-                            inv.status === 'paid' ? 'bg-emerald-500/10 text-emerald-600' :
-                            inv.status === 'pending' ? 'bg-amber-500/10 text-amber-600' :
-                            'bg-red-500/10 text-red-600'
-                          }`}>
-                            {inv.status.charAt(0).toUpperCase() + inv.status.slice(1)}
-                          </span>
-                        </td>
-                        <td className="p-4 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            <button onClick={() => { setEditingInvoice(inv); setIsModalOpen(true); }} className="p-1.5 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors">
-                              <Edit className="w-4 h-4" />
-                            </button>
-                            <button onClick={() => handleDelete(inv.id)} className="p-1.5 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors">
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </>
-      ) : (
-        /* Calculator Tab */
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Inputs */}
-          <div className={`lg:col-span-2 p-6 ${cardClass} space-y-4`}>
-            <h2 className="text-lg font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <Calculator className="w-5 h-5 text-emerald-500" /> Batch Cost & Profit Calculator
-            </h2>
-            <p className="text-xs text-[var(--text-secondary)]">Estimate production costs, feed requirements, and projected profits before harvesting.</p>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Total Birds in Batch</label>
-                <input type="number" min={1} value={birdCount} onChange={e => setBirdCount(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Chick Cost per Bird ({settings.currency})</label>
-                <input type="number" min={0} value={chickPrice} onChange={e => setChickPrice(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Feed Consumption per Bird (kg)</label>
-                <input type="number" step="0.1" min={0} value={feedKgPerBird} onChange={e => setFeedKgPerBird(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Feed Cost per kg ({settings.currency})</label>
-                <input type="number" min={0} value={feedCostPerKg} onChange={e => setFeedCostPerKg(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Medicine & Vaccine per Bird ({settings.currency})</label>
-                <input type="number" min={0} value={medicinePerBird} onChange={e => setMedicinePerBird(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Labour & Overhead per Bird ({settings.currency})</label>
-                <input type="number" min={0} value={otherCostPerBird} onChange={e => setOtherCostPerBird(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Expected Mortality Rate (%)</label>
-                <input type="number" step="0.1" min={0} max={100} value={mortalityRate} onChange={e => setMortalityRate(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Avg Body Weight at Sale (kg)</label>
-                <input type="number" step="0.1" min={0.5} value={avgWeightKg} onChange={e => setAvgWeightKg(Number(e.target.value))} className={inputClass} />
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Selling Price per kg ({settings.currency})</label>
-                <input type="number" min={0} value={sellingPricePerKg} onChange={e => setSellingPricePerKg(Number(e.target.value))} className={inputClass} />
-              </div>
-            </div>
-          </div>
-
-          {/* Results Card */}
-          <div className={`p-6 ${cardClass} space-y-4 flex flex-col justify-between`}>
-            <div>
-              <h3 className="text-base font-bold text-[var(--text-primary)] mb-4">Calculation Results</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Birds Harvested:</span>
-                  <span className="font-semibold text-[var(--text-primary)]">{birdsAlive.toLocaleString()} birds</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Total Live Weight:</span>
-                  <span className="font-semibold text-[var(--text-primary)]">{totalWeightKg.toFixed(1)} kg</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Total Feed Needed:</span>
-                  <span className="font-semibold text-[var(--text-primary)]">{(birdCount * feedKgPerBird).toFixed(1)} kg</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Total Production Cost:</span>
-                  <span className="font-semibold text-red-500">{settings.currency}{totalProductionCost.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Cost per kg:</span>
-                  <span className="font-semibold text-[var(--text-primary)]">{settings.currency}{costPerKg.toFixed(2)}/kg</span>
-                </div>
-                <div className="flex justify-between py-1.5 border-b border-[var(--border-color)]">
-                  <span className="text-[var(--text-secondary)]">Gross Expected Revenue:</span>
-                  <span className="font-semibold text-blue-500">{settings.currency}{grossRevenueCalc.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between py-2 bg-[var(--bg-primary)] px-3 rounded-xl">
-                  <span className="font-bold text-[var(--text-primary)]">Net Estimated Profit:</span>
-                  <span className={`font-bold text-lg ${netProfitCalc >= 0 ? 'text-emerald-500' : 'text-red-500'}`}>
-                    {settings.currency}{netProfitCalc.toLocaleString()}
-                  </span>
-                </div>
-                <div className="flex justify-between text-xs text-[var(--text-muted)] px-1">
-                  <span>Profit per Bird: {settings.currency}{profitPerBird.toFixed(2)}</span>
-                  <span>FCR: {(feedKgPerBird / avgWeightKg).toFixed(2)}</span>
-                </div>
-              </div>
-            </div>
-
+      {/* Mode Selector Tabs with Fluid Sliding Pill */}
+      <div className="flex flex-wrap gap-1.5 p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] w-fit relative">
+        {tabs.map((tab) => {
+          const isActive = calcMode === tab.id;
+          return (
             <button
-              onClick={() => {
-                const newInv: Invoice = {
-                  id: `INV-${Date.now().toString().slice(-6)}`,
-                  customerName: "Projected Batch Sale",
-                  description: `${birdsAlive} Birds @ ${avgWeightKg}kg (${totalWeightKg.toFixed(1)}kg total)`,
-                  amount: grossRevenueCalc,
-                  date: new Date().toISOString().split('T')[0],
-                  dueDate: new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0],
-                  status: 'pending',
-                };
-                saveInvoices([...invoices, newInv]);
-                setActiveTab('invoices');
-              }}
-              className={`w-full py-2.5 rounded-xl text-white text-xs font-semibold flex items-center justify-center gap-2 ${
-                isObsidian ? 'bg-gradient-to-r from-violet-600 to-cyan-600' : 'bg-emerald-500 hover:bg-emerald-600'
+              key={tab.id}
+              onClick={() => setCalcMode(tab.id as any)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200 relative select-none ${
+                isActive
+                  ? isLiquid
+                    ? 'text-cyan-300'
+                    : 'text-white'
+                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
             >
-              Convert to New Invoice <ArrowRight className="w-3.5 h-3.5" />
+              {isActive && (
+                <motion.div
+                  layoutId="activeBillingTabPill"
+                  transition={{ type: 'spring', stiffness: 420, damping: 30 }}
+                  className={`absolute inset-0 rounded-xl ${
+                    isLiquid
+                      ? 'bg-cyan-500/20 border border-cyan-500/30 shadow-md shadow-cyan-500/10'
+                      : 'bg-emerald-500 shadow-md shadow-emerald-500/20'
+                  }`}
+                />
+              )}
+              <span className="relative z-10">{tab.icon}</span>
+              <span className="relative z-10">{tab.label}</span>
             </button>
-          </div>
-        </div>
-      )}
+          );
+        })}
+      </div>
 
-      {/* Invoice Modal */}
-      {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-          <div className={`w-full max-w-md p-6 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] shadow-xl ${isObsidian ? 'obsidian-glass' : ''}`}>
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-bold text-[var(--text-primary)]">
-                {editingInvoice ? 'Edit Invoice' : 'Create New Invoice'}
-              </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-[var(--text-secondary)] hover:bg-[var(--bg-primary)] rounded-xl transition-colors">
-                <X className="w-5 h-5" />
-              </button>
+      {/* Main 2-Column Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {/* Left Column: Quick Calculator Card */}
+        <div className="lg:col-span-6">
+          <TiltCard maxTilt={8} glare={true}>
+            <div
+              className={`p-6 sm:p-7 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
+                isLiquid ? 'liquid-panel' : 'shadow-sm'
+              }`}
+            >
+            {/* Card Title & Sparkle */}
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+                    isLiquid
+                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                      : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                  }`}
+                >
+                  <Calculator className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text-primary)]">
+                    Quick Calculator
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    Enter details to compute total in real time
+                  </p>
+                </div>
+              </div>
+              <Sparkles
+                className={`w-5 h-5 ${isLiquid ? 'text-cyan-400 animate-pulse' : 'text-emerald-400'}`}
+              />
             </div>
-            <form onSubmit={handleSaveInvoice} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Customer / Buyer Name *</label>
-                <input required type="text" name="customerName" defaultValue={editingInvoice?.customerName} className={inputClass} placeholder="e.g. Hyderabad Poultry Center" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Description *</label>
-                <input required type="text" name="description" defaultValue={editingInvoice?.description} className={inputClass} placeholder="e.g. 500 Live Birds (Broiler)" />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Total Amount ({settings.currency}) *</label>
-                <input required type="number" min="0" step="0.01" name="amount" defaultValue={editingInvoice?.amount} className={inputClass} placeholder="0.00" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
+
+            {/* Inputs based on active mode */}
+            <div className="space-y-4">
+              {calcMode === 'chick' && (
+                <>
+                  {/* Chick Rate (per unit) */}
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Chick Rate (per unit)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                        ₹
+                      </div>
+                      <input
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        value={chickRate}
+                        onChange={(e) => setChickRate(e.target.value)}
+                        placeholder="Enter rate per chick (e.g. 38)"
+                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Number of Chicks */}
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Number of Chicks
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                        #
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={numberOfChicks}
+                        onChange={(e) => setNumberOfChicks(e.target.value)}
+                        placeholder="Enter quantity (e.g. 5000)"
+                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {calcMode === 'feed' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Number of Feed Bags (50kg each)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                        #
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={feedBags}
+                        onChange={(e) => setFeedBags(e.target.value)}
+                        placeholder="Enter number of bags (e.g. 100)"
+                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Price Per Bag (₹)
+                    </label>
+                    <div className="relative">
+                      <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-sm text-[var(--text-muted)] font-semibold">
+                        ₹
+                      </div>
+                      <input
+                        type="number"
+                        min="0"
+                        value={feedBagPrice}
+                        onChange={(e) => setFeedBagPrice(e.target.value)}
+                        placeholder="e.g. 2150"
+                        className="w-full pl-9 pr-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {calcMode === 'fcr' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Total Feed Consumed (kg)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={fcrFeedTotalKg}
+                      onChange={(e) => setFcrFeedTotalKg(e.target.value)}
+                      placeholder="e.g. 15400"
+                      className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Total Weight Gained / Harvested (kg)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={fcrWeightTotalKg}
+                      onChange={(e) => setFcrWeightTotalKg(e.target.value)}
+                      placeholder="e.g. 9800"
+                      className="w-full px-4 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm placeholder-[var(--text-muted)] focus:outline-none transition-all"
+                    />
+                  </div>
+                </>
+              )}
+
+              {calcMode === 'medicine' && (
+                <>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Number of Birds
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={medBirds}
+                        onChange={(e) => setMedBirds(e.target.value)}
+                        placeholder="e.g. 5000"
+                        className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                        Dosage (ml/bird)
+                      </label>
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={medDosagePerBird}
+                        onChange={(e) => setMedDosagePerBird(e.target.value)}
+                        placeholder="e.g. 0.2"
+                        className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                      Cost per Litre (₹)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={medCostPerLitre}
+                      onChange={(e) => setMedCostPerLitre(e.target.value)}
+                      placeholder="e.g. 1400"
+                      className="w-full px-3.5 py-3 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-2xl text-sm focus:outline-none"
+                    />
+                  </div>
+                </>
+              )}
+
+              {/* Optional Batch Selection & Notes */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Invoice Date</label>
-                  <input required type="date" name="date" defaultValue={editingInvoice?.date || new Date().toISOString().split('T')[0]} className={inputClass} />
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                    Assign to Batch (Optional)
+                  </label>
+                  <select
+                    value={selectedBatchId}
+                    onChange={(e) => setSelectedBatchId(e.target.value)}
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl text-xs focus:outline-none"
+                  >
+                    <option value="">-- None (General) --</option>
+                    {batches.map((b) => (
+                      <option key={b.id} value={b.id}>
+                        {b.batchNumber} - {b.batchName || b.breedType}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Due Date</label>
-                  <input required type="date" name="dueDate" defaultValue={editingInvoice?.dueDate || new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0]} className={inputClass} />
+                  <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
+                    Notes / Tag
+                  </label>
+                  <input
+                    type="text"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    placeholder="e.g. Cobb 500 First Lift"
+                    className="w-full px-3.5 py-2.5 bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-primary)] rounded-xl text-xs focus:outline-none"
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">Payment Status</label>
-                <select name="status" defaultValue={editingInvoice?.status || 'pending'} className={inputClass}>
-                  <option value="pending">Pending</option>
-                  <option value="paid">Paid</option>
-                  <option value="overdue">Overdue</option>
-                </select>
+
+              {/* Total Amount Green Container matching user screenshot */}
+              <motion.div
+                layout
+                className={`mt-6 p-6 rounded-3xl text-center border transition-all duration-300 ${
+                  isLiquid
+                    ? 'bg-cyan-950/40 border-cyan-500/30 shadow-lg shadow-cyan-500/10'
+                    : 'bg-emerald-950/30 dark:bg-emerald-950/60 border-emerald-500/20 shadow-md'
+                }`}
+              >
+                <span className="text-[11px] font-bold tracking-wider text-[var(--text-muted)] uppercase block mb-1">
+                  {calcMode === 'fcr' ? 'FEED CONVERSION RATIO (FCR)' : 'TOTAL AMOUNT'}
+                </span>
+                <div
+                  className={`text-3xl sm:text-4xl font-black tracking-tight my-1 ${
+                    isLiquid ? 'text-cyan-300' : 'text-white dark:text-emerald-300'
+                  }`}
+                >
+                  {calcMode === 'fcr' ? (
+                    <span>{fcrScore}</span>
+                  ) : (
+                    <AnimatedCounter value={currentTotal} prefix="₹ " />
+                  )}
+                </div>
+                <p className="text-xs text-[var(--text-muted)] mt-1 font-medium">
+                  {currentTotal > 0 || calcMode === 'fcr'
+                    ? calcMode === 'fcr'
+                      ? parseFloat(fcrScore) > 0 && parseFloat(fcrScore) <= 1.6
+                        ? '🌟 Excellent Broiler Efficiency'
+                        : parseFloat(fcrScore) > 1.6
+                        ? '⚠️ Higher feed conversion ratio'
+                        : 'Enter values above'
+                      : 'Live computation ready'
+                    : 'Enter values above to see the total'}
+                </p>
+              </motion.div>
+
+              {/* Save Button matching screenshot */}
+              <motion.button
+                whileHover={{ scale: 1.015 }}
+                whileTap={{ scale: 0.97 }}
+                type="button"
+                onClick={handleSaveToHistory}
+                disabled={saving || (currentTotal <= 0 && calcMode !== 'fcr')}
+                className={`w-full mt-4 py-3.5 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 text-white transition-all shadow-lg ${
+                  isLiquid
+                    ? 'bg-gradient-to-r from-cyan-500 via-emerald-500 to-teal-400 shadow-cyan-500/25'
+                    : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/25'
+                } ${
+                  currentTotal <= 0 && calcMode !== 'fcr'
+                    ? 'opacity-60 cursor-not-allowed'
+                    : 'cursor-pointer'
+                }`}
+              >
+                {saving ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                ) : (
+                  <>
+                    <Plus className="w-4 h-4" />
+                    <span>+ Save to History</span>
+                  </>
+                )}
+              </motion.button>
+
+              {successMsg && (
+                <motion.div
+                  initial={{ opacity: 0, y: 5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs flex items-center justify-center gap-2 font-medium"
+                >
+                  <CheckCircle className="w-4 h-4" />
+                  <span>{successMsg}</span>
+                </motion.div>
+              )}
+            </div>
+          </div>
+          </TiltCard>
+        </div>
+
+        {/* Right Column: Billing History matching screenshot */}
+        <div className="lg:col-span-6">
+          <div
+            className={`p-6 sm:p-7 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
+              isLiquid ? 'liquid-panel' : 'shadow-sm'
+            }`}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                    isLiquid
+                      ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                      : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                  }`}
+                >
+                  <Receipt className="w-5 h-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-[var(--text-primary)]">
+                    Billing History
+                  </h2>
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {billingHistory.length} calculations recorded
+                  </p>
+                </div>
               </div>
-              <div className="pt-2 flex gap-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="flex-1 px-4 py-2.5 bg-[var(--bg-primary)] text-[var(--text-primary)] border border-[var(--border-color)] rounded-xl hover:bg-[var(--border-color)] transition-all text-sm">
-                  Cancel
+
+              {billingHistory.length > 0 && (
+                <button
+                  onClick={exportHistoryCSV}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+                  title="Export to CSV"
+                >
+                  <Download className="w-3.5 h-3.5" />
+                  <span>Export CSV</span>
                 </button>
-                <button type="submit" className={`flex-1 py-2.5 text-white rounded-xl text-sm font-medium ${
-                  isObsidian ? 'bg-gradient-to-r from-violet-600 to-cyan-600 hover:opacity-90' : 'bg-emerald-500 hover:bg-emerald-600'
-                }`}>
-                  Save Invoice
-                </button>
+              )}
+            </div>
+
+            {/* List of saved calculations */}
+            {billingHistory.length === 0 ? (
+              <div className="p-10 text-center text-[var(--text-muted)] border border-dashed border-[var(--border-color)] rounded-2xl">
+                <Receipt className="w-10 h-10 mx-auto opacity-30 mb-2" />
+                <p className="text-xs">No saved calculations yet.</p>
+                <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                  Perform a calculation on the left and click &quot;Save to History&quot;.
+                </p>
               </div>
-            </form>
+            ) : (
+              <div className="space-y-3 max-h-[520px] overflow-y-auto pr-1">
+                <AnimatePresence>
+                  {billingHistory.map((item) => {
+                    const formattedDate = new Date(item.date || item.createdAt).toLocaleDateString('en-IN', {
+                      day: 'numeric',
+                      month: 'short',
+                      year: 'numeric',
+                    });
+
+                    return (
+                      <motion.div
+                        key={item.id}
+                        initial={{ opacity: 0, y: -10, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.95 }}
+                        transition={{ type: 'spring', stiffness: 350, damping: 25 }}
+                        className={`p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-input)] transition-all flex items-center justify-between gap-3 ${
+                          isLiquid ? 'hover:border-cyan-500/40' : 'hover:border-emerald-500/30'
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span
+                              className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                                item.type === 'chick_purchase'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : item.type === 'feed_purchase'
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  : item.type === 'fcr_calculation'
+                                  ? 'bg-cyan-500/10 text-cyan-400 border border-cyan-500/20'
+                                  : 'bg-violet-500/10 text-violet-400 border border-violet-500/20'
+                              }`}
+                            >
+                              {item.type.replace('_', ' ')}
+                            </span>
+                            {item.batch && (
+                              <span className="text-[10px] text-[var(--text-muted)] font-medium flex items-center gap-1">
+                                <Layers className="w-3 h-3" />
+                                {item.batch.batchNumber}
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-[var(--text-secondary)] line-clamp-1 font-medium">
+                            {item.notes || 'Calculation record'}
+                          </p>
+
+                          <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 mt-1">
+                            <Clock className="w-3 h-3" />
+                            {formattedDate}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm sm:text-base font-extrabold text-[var(--text-primary)]">
+                            {item.type === 'fcr_calculation'
+                              ? `FCR ${item.fcrScore || item.totalAmount}`
+                              : `₹ ${item.totalAmount.toLocaleString()}`}
+                          </span>
+
+                          <button
+                            onClick={() => deleteBillingCalculation(item.id)}
+                            className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
+                            title="Delete Calculation"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+            )}
           </div>
         </div>
-      )}
+      </div>
     </div>
   );
 }

@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import ThemeInitializer from "@/components/ThemeInitializer";
 
 export const metadata: Metadata = {
-  title: "ChickFarm Pro - Premium Chicken Farm Management",
+  title: "ChickFarm Pro - Commercial Chicken Farm Management",
   description:
     "A modern, premium chicken farm management platform with real-time analytics, batch tracking, expense management, and comprehensive reporting.",
   keywords:
@@ -15,7 +16,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="dark">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
@@ -24,11 +25,39 @@ export default function RootLayout({
           crossOrigin="anonymous"
         />
         <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap"
+          href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&family=Inter:wght@300;400;500;600;700;800&display=swap"
           rel="stylesheet"
         />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              try {
+                const stored = localStorage.getItem('chickfarm-master-persistence-v3');
+                if (stored) {
+                  const parsed = JSON.parse(stored);
+                  const theme = parsed?.state?.theme;
+                  if (theme === 'light') {
+                    document.documentElement.classList.remove('dark', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.add('light');
+                  } else if (theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass') {
+                    document.documentElement.classList.remove('dark', 'light');
+                    document.documentElement.classList.add('liquid', 'liquid-glass', 'obsidian');
+                  } else {
+                    document.documentElement.classList.remove('light', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.add('dark');
+                  }
+                } else {
+                  document.documentElement.classList.add('dark');
+                }
+              } catch (e) {
+                document.documentElement.classList.add('dark');
+              }
+            `,
+          }}
+        />
       </head>
-      <body className="antialiased" suppressHydrationWarning>
+      <body className="antialiased bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500" suppressHydrationWarning>
+        <ThemeInitializer />
         {children}
       </body>
     </html>
