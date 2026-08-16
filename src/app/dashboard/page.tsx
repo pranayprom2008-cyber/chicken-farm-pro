@@ -46,6 +46,9 @@ import Floating3DChicken from '@/components/Floating3DChicken';
 import WhatsAppReportModal from '@/components/WhatsAppReportModal';
 import FlockHealthAdvisor from '@/components/FlockHealthAdvisor';
 import FeedForecastWidget from '@/components/FeedForecastWidget';
+import TodayFarmBrief from '@/components/TodayFarmBrief';
+import AIFarmInsights from '@/components/AIFarmInsights';
+import AIProfitPrediction from '@/components/AIProfitPrediction';
 import { Send } from 'lucide-react';
 
 const containerVariants = {
@@ -375,8 +378,15 @@ export default function DashboardPage() {
         })}
       </motion.div>
 
-      {/* AI Health Diagnostic & Feed Depletion Forecast Productivity Suite */}
+      {/* Today's AI Farm Executive Brief & Live Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        <TodayFarmBrief />
+        <AIFarmInsights />
+      </div>
+
+      {/* AI Profit Predictor & Health Advisor & Feed Forecast Productivity Suite */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-stretch">
+        <AIProfitPrediction />
         <FlockHealthAdvisor />
         <FeedForecastWidget />
       </div>

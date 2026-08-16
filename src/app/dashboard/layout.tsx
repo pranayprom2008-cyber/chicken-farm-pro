@@ -8,6 +8,7 @@ import Header from '@/components/Header';
 import LiquidBackground from '@/components/LiquidBackground';
 import PageTransition from '@/components/PageTransition';
 import MobileNav from '@/components/MobileNav';
+import ChickAI from '@/components/ChickAI';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, theme, isAuthenticated, syncAll } = useFarmStore();
@@ -69,6 +70,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </main>
         <MobileNav />
+        <ChickAI />
       </div>
     </div>
   );
