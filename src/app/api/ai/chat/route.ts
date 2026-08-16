@@ -78,6 +78,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       message: responseMessage,
+      lastBatchId: engine.getLastBatch(),
     });
   } catch (error: any) {
     console.error('ChickAI Error:', error);

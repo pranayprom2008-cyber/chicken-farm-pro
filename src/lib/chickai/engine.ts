@@ -12,6 +12,10 @@ export class ChickAIEngine {
     this.lastMentionedBatchId = batchId;
   }
 
+  public getLastBatch(): string | null {
+    return this.lastMentionedBatchId;
+  }
+
   // 1. Process natural language query
   public processQuery(userQuery: string, history: ChickAIMessage[] = []): ChickAIMessage {
     const queryLower = userQuery.toLowerCase().trim();
@@ -190,12 +194,13 @@ export class ChickAIEngine {
     return null;
   }
 
-  // 3. Check for actionable proposals (Create expense, update mortality)
+  // 3. Check for actionable proposals (Create expense, update mortality, log feed, record sale)
   private checkActionProposal(query: string, targetBatch: any | null): { text: string; proposal: any } | null {
     const q = query.toLowerCase();
+    const batch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
 
     // Check for "Add ₹X [category] expense to [batch]"
-    if ((q.includes('add') || q.includes('record') || q.includes('create')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('feed') || q.includes('medicine') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance'))) {
+    if ((q.includes('add') || q.includes('record') || q.includes('create') || q.includes('save')) && (q.includes('expense') || q.includes('cost') || q.includes('rupees') || q.includes('₹') || q.includes('electricity') || q.includes('labour') || q.includes('maintenance'))) {
       const amountMatch = query.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)(?:\s*(?:rupees|rs|inr))?/i);
       const amount = amountMatch ? parseFloat(amountMatch[1].replace(/,/g, '')) : null;
 
@@ -205,8 +210,6 @@ export class ChickAIEngine {
       else if (q.includes('electricity') || q.includes('power')) category = 'Electricity';
       else if (q.includes('labour') || q.includes('labor') || q.includes('wage') || q.includes('salary')) category = 'Labour';
       else if (q.includes('maintenance') || q.includes('repair')) category = 'Maintenance';
-
-      const batch = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
 
       if (amount && amount > 0) {
         return {
@@ -225,6 +228,56 @@ export class ChickAIEngine {
           },
         };
       }
+    }
+
+    // Check for "Add X dead birds / mortality to Batch"
+    if ((q.includes('dead') || q.includes('mortality') || q.includes('died')) && (q.includes('add') || q.includes('log') || q.includes('record'))) {
+      const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality)?/i);
+      const count = countMatch ? parseInt(countMatch[1], 10) : null;
+
+      if (count && count > 0 && batch) {
+        return {
+          text: `I found the following mortality telemetry log:\n\n• **Batch:** ${batch.batchNumber}\n• **Mortality Count:** ${count} dead birds\n• **Date:** Today (${new Date().toLocaleDateString('en-IN')})\n\nDo you want me to record this daily mortality?`,
+          proposal: {
+            type: 'add_mortality',
+            title: `Log ${count} Mortality for ${batch.batchNumber}`,
+            details: {
+              batchId: batch.id,
+              batchNumber: batch.batchNumber,
+              deadChicks: count,
+              aliveChicks: Math.max(0, batch.aliveChicks - count),
+            },
+            status: 'pending',
+          },
+        };
+      }
+    }
+
+    // Check for "Record sale of X birds at ₹Y"
+    if ((q.includes('sale') || q.includes('sold')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
+      const birdsMatch = query.match(/(\d+)\s*(?:birds|chickens|chicks)/i);
+      const rateMatch = query.match(/(?:₹|at|@|rs\.?)\s*(\d+)/i);
+      const birdsSold = birdsMatch ? parseInt(birdsMatch[1], 10) : 500;
+      const rate = rateMatch ? parseFloat(rateMatch[1]) : 115;
+      const avgWeight = 2.25;
+      const grossRevenue = Math.round(birdsSold * avgWeight * rate);
+
+      return {
+        text: `I prepared the following commercial bird sale receipt:\n\n• **Batch:** ${batch ? batch.batchNumber : 'Active Batch'}\n• **Birds Sold:** ${birdsSold.toLocaleString()} birds\n• **Rate:** ₹ ${rate} / kg (Avg Wt: ${avgWeight} kg)\n• **Gross Total Revenue:** ₹ ${grossRevenue.toLocaleString('en-IN')}\n\nWould you like me to record this bird sale in your database?`,
+        proposal: {
+          type: 'create_sale',
+          title: `Record Sale of ${birdsSold} birds (₹${grossRevenue.toLocaleString('en-IN')})`,
+          details: {
+            batchId: batch ? batch.id : undefined,
+            buyer: 'Wholesale Poultry Trader',
+            chickensSold: birdsSold,
+            averageWeight: avgWeight,
+            pricePerKg: rate,
+            totalRevenue: grossRevenue,
+          },
+          status: 'pending',
+        },
+      };
     }
 
     return null;

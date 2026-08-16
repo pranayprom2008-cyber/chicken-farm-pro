@@ -20,6 +20,7 @@ import {
   Maximize2,
   Minimize2,
   RefreshCw,
+  RotateCcw,
   Check
 } from 'lucide-react';
 import { useFarmStore } from '@/store/useFarmStore';
@@ -42,6 +43,7 @@ export default function ChickAI() {
   const [isExpanded, setIsExpanded] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
+  const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChickAIMessage[]>([
     {
       id: 'welcome',
@@ -98,12 +100,16 @@ export default function ChickAI() {
           message: text.trim(),
           history: messages,
           clientContext,
+          lastBatchId: activeBatchId,
         }),
       });
 
       const data = await res.json();
 
       if (data.success && data.message) {
+        if (data.lastBatchId) {
+          setActiveBatchId(data.lastBatchId);
+        }
         setMessages((prev) => [...prev, data.message]);
       } else {
         setMessages((prev) => [
@@ -131,9 +137,10 @@ export default function ChickAI() {
     }
   };
 
-  // Handle Action Confirmation (e.g. creating expense from AI prompt)
+  // Handle Action Confirmation (e.g. creating expense, mortality, sales from AI prompt)
   const handleConfirmAction = async (msgId: string, proposal: any) => {
     try {
+      let confirmationText = '';
       if (proposal.type === 'create_expense') {
         const { category, amount, batchId, description } = proposal.details;
         await store.createExpense({
@@ -143,6 +150,27 @@ export default function ChickAI() {
           description: description || 'ChickAI logged expense',
           date: new Date().toISOString().split('T')[0],
         });
+        confirmationText = `✅ **Expense Confirmed!** The ₹${amount?.toLocaleString('en-IN')} ${category} expense has been saved to your database.`;
+      } else if (proposal.type === 'add_mortality') {
+        const { batchId, deadChicks } = proposal.details;
+        await store.createDailyRecord({
+          batchId,
+          deadChicks,
+          feedConsumed: 0,
+          averageWeight: 0,
+        });
+        confirmationText = `✅ **Mortality Recorded!** Logged ${deadChicks} dead birds. Live batch counts updated.`;
+      } else if (proposal.type === 'create_sale') {
+        const { batchId, buyer, chickensSold, averageWeight, pricePerKg } = proposal.details;
+        await store.createSaleRecord({
+          batchId,
+          buyer,
+          chickensSold,
+          averageWeight,
+          pricePerKg,
+          saleDate: new Date().toISOString().split('T')[0],
+        });
+        confirmationText = `✅ **Bird Sale Recorded!** Saved dispatch of ${chickensSold} birds at ₹${pricePerKg}/kg.`;
       }
 
       // Update message state
@@ -164,7 +192,7 @@ export default function ChickAI() {
         {
           id: `conf-${Date.now()}`,
           sender: 'assistant',
-          text: `✅ **Action Confirmed!** The ₹${proposal.details.amount?.toLocaleString('en-IN')} ${proposal.details.category} expense has been successfully saved to your database and live totals recalculated.`,
+          text: confirmationText || '✅ Action successfully confirmed and saved.',
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
@@ -247,6 +275,23 @@ export default function ChickAI() {
               </div>
 
               <div className="flex items-center gap-1 text-slate-400">
+                <button
+                  onClick={() => {
+                    setActiveBatchId(null);
+                    setMessages([
+                      {
+                        id: 'welcome',
+                        sender: 'assistant',
+                        text: `👋 **Welcome back!** Chat history cleared. How can I assist with your farm operations?`,
+                        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                      },
+                    ]);
+                  }}
+                  className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
+                  title="Reset conversation"
+                >
+                  <RotateCcw className="w-4 h-4" />
+                </button>
                 <button
                   onClick={() => setIsExpanded((prev) => !prev)}
                   className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
