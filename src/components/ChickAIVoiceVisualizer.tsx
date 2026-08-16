@@ -24,14 +24,14 @@ export default function ChickAIVoiceVisualizer({
   const getStatusText = () => {
     switch (state) {
       case 'listening':
-        return '🔴 Listening to farm command...';
+        return '🔴 Listening to you...';
       case 'thinking':
-        return '🧠 Neural Core Processing...';
+        return '✨ ChickAI is thinking...';
       case 'speaking':
-        return '🔊 ChickAI Speaking (Tap to Interrupt)';
+        return '🔊 ChickAI is speaking (Tap to pause)';
       case 'idle':
       default:
-        return '🎙️ Voice Copilot Ready';
+        return '🎙️ ChickAI Voice Ready';
     }
   };
 
@@ -60,11 +60,11 @@ export default function ChickAIVoiceVisualizer({
 
       {/* Top Telemetry Header */}
       <div className="w-full flex items-center justify-between text-[10px] tracking-widest text-[var(--text-muted)] uppercase mb-4 z-10 font-mono">
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5 text-teal-300 font-bold">
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>NEURAL CORE • TELEMETRY SYNC</span>
+          <span>✨ CHICKAI VOICE COPILOT</span>
         </span>
-        <span className="text-[var(--text-secondary)]">{autoSpeak ? 'AUTO-TTS: ON' : 'AUTO-TTS: OFF'}</span>
+        <span className="text-[var(--text-secondary)]">{autoSpeak ? 'AUTO-VOICE: ON' : 'AUTO-VOICE: OFF'}</span>
       </div>
 
       {/* Central Circular AI Core */}

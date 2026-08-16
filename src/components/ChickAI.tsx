@@ -315,7 +315,7 @@ export default function ChickAI() {
 
   // Test Voice Persona Button
   const handleTestVoicePersona = () => {
-    const previewText = "Good evening. Your farm intelligence system is online. Livability is optimal at ninety-seven point six percent. How can I assist with your flocks today?";
+    const previewText = "Hi there! I'm ChickAI, your friendly farm copilot. All your flocks are doing great today. How can I help you?";
     voiceServiceRef.current.speak(previewText, voiceSettings);
   };
 
@@ -324,7 +324,7 @@ export default function ChickAI() {
     const nextMode = !activeVoiceMode;
     setActiveVoiceMode(nextMode);
     if (nextMode) {
-      const greeting = `${getGreeting().replace('✨ ', '')}. Your farm intelligence system is online. How can I help?`;
+      const greeting = "Hi there! I'm ready to help with your farm. What would you like to check or record?";
       voiceServiceRef.current.speak(greeting, voiceSettings, () => setVoiceState('speaking'), () => {
         if (voiceSettings.voiceCommands) startListening();
         else setVoiceState('idle');

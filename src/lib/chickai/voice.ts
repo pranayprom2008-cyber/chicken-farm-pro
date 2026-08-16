@@ -4,7 +4,7 @@
 
 export interface VoiceSettings {
   enabled: boolean;
-  voicePersona: 'futuristic-male' | 'professional-male' | 'futuristic-female' | 'professional-female';
+  voicePersona: 'friendly-assistant' | 'friendly-female' | 'friendly-male' | 'professional-clear';
   speed: number; // 0.8 to 1.2
   volume: number; // 0 to 1
   autoSpeak: boolean;
@@ -14,8 +14,8 @@ export interface VoiceSettings {
 
 export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
   enabled: true,
-  voicePersona: 'futuristic-male',
-  speed: 0.96,
+  voicePersona: 'friendly-assistant',
+  speed: 1.0,
   volume: 1.0,
   autoSpeak: true,
   voiceCommands: true,
@@ -23,7 +23,7 @@ export const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
 };
 
 /**
- * Converts rich markdown and financial text into clean, conversational voice speech
+ * Converts rich markdown and financial text into clean, warm, friendly conversational voice speech
  */
 export function formatTextForSpeech(text: string): string {
   let spoken = text;
@@ -53,8 +53,8 @@ export function formatTextForSpeech(text: string): string {
     return `${num} rupees`;
   });
 
-  // Convert kg feed and counts
-  spoken = spoken.replace(/(\d+)\s*kg/gi, '$1 kilograms');
+  // Convert kg feed and percentages
+  spoken = spoken.replace(/(\d+)\s*kg/gi, '$1 kilos');
   spoken = spoken.replace(/(\d+(?:\.\d+)?)\s*%/g, '$1 percent');
 
   // Convert Batch numbers (e.g. B-2026-01 -> Batch 1, Batch-45 -> Batch 45)
@@ -64,12 +64,12 @@ export function formatTextForSpeech(text: string): string {
   spoken = spoken.replace(/^[•\-*]\s+/gm, '');
   spoken = spoken.replace(/✅|🔴|🟡|🟢|⚠️|🚨|🌾|🐥|🐔|💊|⚡|👥|🔧|💰|📈|🏆|💡|📋|📁|📱|👋|✨/g, '');
 
-  // Collapse excess whitespace
+  // Collapse excess whitespace into natural pauses
   spoken = spoken.replace(/\n{2,}/g, '. ').replace(/\n/g, ' ').trim();
 
-  // If the text contained complex tables or charts, add screen reference note
+  // If the text contained complex tables or charts, add a friendly screen reference note
   if (text.includes('|') || text.includes('####') || text.includes('Simulation Assumptions')) {
-    spoken += " I've displayed the detailed breakdown on your screen.";
+    spoken += " I've put the full breakdown right on your screen.";
   }
 
   return spoken;
@@ -120,49 +120,57 @@ export class ChickAIVoiceService {
       const spokenText = formatTextForSpeech(text);
       if (!spokenText) {
         resolve();
-        return;
       }
 
       const utterance = new SpeechSynthesisUtterance(spokenText);
       const voices = this.getAvailableVoices();
 
-      // Find the most suitable neural / cinematic voice
       let selectedVoice: SpeechSynthesisVoice | null = null;
 
-      if (settings.voicePersona.includes('male')) {
-        // Look for deep, calm, British or US English male neural voice
+      // Friendly Female / Assistant selection
+      if (settings.voicePersona === 'friendly-assistant' || settings.voicePersona === 'friendly-female') {
         selectedVoice =
-          voices.find((v) => v.name.includes('Natural') && (v.name.includes('Guy') || v.name.includes('George') || v.name.includes('Ryan') || v.name.includes('Male'))) ||
-          voices.find((v) => v.name.includes('Google UK English Male')) ||
-          voices.find((v) => v.name.includes('Google US English') && v.name.includes('Male')) ||
-          voices.find((v) => v.name.includes('Daniel') || v.name.includes('Oliver') || v.name.includes('Arthur')) ||
-          voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ||
-          voices.find((v) => v.lang === 'en-GB' || v.lang === 'en-US') ||
-          voices[0] ||
-          null;
-
-        // Cinematic futuristic resonance tuning: slightly deeper pitch & steady pace
-        utterance.pitch = settings.voicePersona === 'futuristic-male' ? 0.90 : 0.98;
-      } else {
-        // Female persona
-        selectedVoice =
-          voices.find((v) => v.name.includes('Natural') && (v.name.includes('Aria') || v.name.includes('Jenny') || v.name.includes('Sonia') || v.name.includes('Female'))) ||
-          voices.find((v) => v.name.includes('Google UK English Female')) ||
-          voices.find((v) => v.name.includes('Samantha') || v.name.includes('Victoria')) ||
+          voices.find((v) => v.name.includes('Natural') && (v.name.includes('Jenny') || v.name.includes('Aria') || v.name.includes('Michelle') || v.name.includes('Sonia'))) ||
+          voices.find((v) => v.name.includes('Google US English') || v.name.includes('Google UK English Female')) ||
+          voices.find((v) => v.name.includes('Samantha') || v.name.includes('Victoria') || v.name.includes('Karen')) ||
           voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('female')) ||
-          voices.find((v) => v.lang === 'en-US' || v.lang === 'en-GB') ||
+          voices.find((v) => v.lang === 'en-US' || v.lang === 'en-GB' || v.lang === 'en-IN') ||
           voices[0] ||
           null;
 
-        utterance.pitch = settings.voicePersona === 'futuristic-female' ? 1.05 : 1.0;
+        utterance.pitch = 1.02; // Warm, natural, friendly pitch
+      }
+      // Friendly Male selection
+      else if (settings.voicePersona === 'friendly-male') {
+        selectedVoice =
+          voices.find((v) => v.name.includes('Natural') && (v.name.includes('Guy') || v.name.includes('Ryan') || v.name.includes('Christopher') || v.name.includes('George'))) ||
+          voices.find((v) => v.name.includes('Google US English') || v.name.includes('Google UK English Male')) ||
+          voices.find((v) => v.name.includes('Daniel') || v.name.includes('Alex') || v.name.includes('Oliver')) ||
+          voices.find((v) => v.lang.startsWith('en') && v.name.toLowerCase().includes('male')) ||
+          voices.find((v) => v.lang === 'en-US' || v.lang === 'en-GB' || v.lang === 'en-IN') ||
+          voices[0] ||
+          null;
+
+        utterance.pitch = 1.0; // Friendly normal male pitch
+      }
+      // Professional & Clear selection
+      else {
+        selectedVoice =
+          voices.find((v) => v.name.includes('Natural')) ||
+          voices.find((v) => v.lang === 'en-US' || v.lang === 'en-GB' || v.lang === 'en-IN') ||
+          voices[0] ||
+          null;
+
+        utterance.pitch = 1.0;
       }
 
       if (selectedVoice) {
         utterance.voice = selectedVoice;
       }
 
-      utterance.rate = Math.max(0.8, Math.min(1.2, settings.speed));
-      utterance.volume = Math.max(0, Math.min(1, settings.volume));
+      // Normal, friendly speaking rate (1.0x) and clear volume
+      utterance.rate = Math.max(0.85, Math.min(1.2, settings.speed || 1.0));
+      utterance.volume = Math.max(0, Math.min(1, settings.volume ?? 1.0));
 
       utterance.onstart = () => {
         this.isSpeakingState = true;
