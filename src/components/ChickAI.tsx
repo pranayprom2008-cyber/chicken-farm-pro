@@ -113,16 +113,19 @@ export default function ChickAI() {
   const getContextualPrompts = () => {
     if (pathname.includes('/batches')) {
       return [
+        { label: '⚖️ Log 2.1kg Weight', query: 'Record average bird weight 2.1 kg for active batch' },
+        { label: '🌾 Calculate FCR', query: 'Calculate FCR for my active batch' },
+        { label: '⏳ Days to Harvest', query: 'When is the harvest date for my active batch?' },
         { label: '🐔 Add 20 Dead Birds', query: 'Add 20 dead birds to active batch' },
         { label: '🌽 500kg Feed Usage', query: 'Record 500 kg feed consumed for active batch' },
-        { label: '🏆 Best Batch', query: 'Which batch is performing best?' },
-        { label: '📊 Compare Batches', query: 'Compare my active and previous batches' },
         { label: '📈 Predict Profit', query: 'Predict profit for my active batch' },
       ];
     }
     if (pathname.includes('/expenses')) {
       return [
         { label: '💰 Add ₹1000 Feed', query: 'Add ₹1,000 for feed' },
+        { label: '⛽ Add ₹2500 Diesel', query: 'Add ₹2,500 diesel expense' },
+        { label: '💊 Add ₹4000 Vaccine', query: 'Add ₹4,000 vaccination expense' },
         { label: '⚡ Add ₹5000 Electricity', query: 'Add ₹5,000 electricity expense' },
         { label: '🌾 Feed Expenses', query: 'How much did we spend on feed?' },
         { label: '💸 Expense Trends', query: 'Which expenses are increasing?' },
@@ -130,18 +133,22 @@ export default function ChickAI() {
     }
     if (pathname.includes('/revenue')) {
       return [
+        { label: '🎯 Break-Even Price', query: 'What is my break-even price per kg?' },
         { label: '🧾 Log Sale 500 Birds', query: 'Record sale of 500 birds at ₹118' },
         { label: '💰 Revenue Summary', query: 'What is my total realized revenue and net profit?' },
         { label: '📈 Price Simulator', query: 'What if selling price increases by ₹5/kg?' },
       ];
     }
     return [
+      { label: '🌾 Calculate FCR', query: 'Calculate FCR for my active batch' },
+      { label: '🎯 Break-Even Price', query: 'What is my break-even price per kg?' },
+      { label: '⏳ Days to Harvest', query: 'When is harvest date?' },
       { label: '💰 Add ₹1000 Feed', query: 'Add ₹1,000 for feed' },
+      { label: '⛽ Add ₹2500 Diesel', query: 'Add ₹2,500 diesel expense' },
+      { label: '💧 Water Sanitation', query: 'What chlorine level should I use for drinking water?' },
       { label: '☀️ Morning Farm Brief', query: 'What should I focus on today?' },
       { label: '📊 Weekly Excel Report', query: 'Generate weekly audit report for 9849852085 in Excel format' },
       { label: '🏆 Farm AI Score', query: 'Calculate my Farm AI Score' },
-      { label: '🧮 What-If Simulator', query: 'What if feed price increases by ₹3/kg?' },
-      { label: '🚨 Find Problems', query: 'Find any problems or alerts on the farm' },
     ];
   };
 
