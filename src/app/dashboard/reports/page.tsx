@@ -15,6 +15,8 @@ import {
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import WeeklyReportModal from '@/components/WeeklyReportModal';
+import { Send, FileSpreadsheet as ExcelIcon } from 'lucide-react';
 
 export default function ReportsPage() {
   const { theme, batches, expenses, stats, settings } = useFarmStore();
@@ -23,6 +25,7 @@ export default function ReportsPage() {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('');
   const [downloading, setDownloading] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
 
   const isLiquid = theme === 'obsidian' || theme === 'liquid-glass';
   const currency = settings.currency || '₹';
@@ -194,6 +197,14 @@ export default function ReportsPage() {
             Generate printable PDF statements, Excel workbooks, and CSV logs
           </p>
         </div>
+
+        <button
+          onClick={() => setShowWeeklyModal(true)}
+          className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
+        >
+          <ExcelIcon className="w-4 h-4" />
+          <span>Dispatch Weekly Excel (9849852085)</span>
+        </button>
       </div>
 
       {/* Report Type Selector Cards */}
@@ -309,6 +320,12 @@ export default function ReportsPage() {
           )}
         </div>
       </div>
+
+      {/* Weekly Report & Excel Dispatch Modal */}
+      <WeeklyReportModal
+        isOpen={showWeeklyModal}
+        onClose={() => setShowWeeklyModal(false)}
+      />
     </div>
   );
 }

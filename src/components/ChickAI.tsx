@@ -21,13 +21,16 @@ import {
   Minimize2,
   RefreshCw,
   RotateCcw,
+  FileSpreadsheet,
   Check
 } from 'lucide-react';
 import { useFarmStore } from '@/store/useFarmStore';
 import { ChickAIMessage } from '@/lib/chickai/types';
 import ReactMarkdown from 'react-markdown';
+import WeeklyReportModal from '@/components/WeeklyReportModal';
 
 const quickPrompts = [
+  { label: '📊 Weekly Excel Report', query: 'Generate weekly audit report for 9849852085 in Excel format' },
   { label: '🐔 Analyze My Batches', query: 'How are my active batches performing?' },
   { label: '💰 Analyze Expenses', query: 'What is my biggest expense and how much did we spend on feed?' },
   { label: '📈 Predict Profit', query: 'Predict profit for my active batch' },
@@ -41,6 +44,7 @@ export default function ChickAI() {
   const store = useFarmStore();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
@@ -440,6 +444,19 @@ export default function ChickAI() {
                         </div>
                       )}
 
+                      {/* Weekly Report Action Button if message contains weekly audit */}
+                      {m.text.includes('Weekly Farm Executive Audit Report') && (
+                        <div className="pt-2">
+                          <button
+                            onClick={() => setShowWeeklyModal(true)}
+                            className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer w-full justify-center"
+                          >
+                            <FileSpreadsheet className="w-4 h-4" />
+                            <span>Download Excel & Send to 9849852085</span>
+                          </button>
+                        </div>
+                      )}
+
                       <span className="text-[9px] text-slate-400 block px-1">
                         {m.timestamp}
                       </span>
@@ -495,6 +512,12 @@ export default function ChickAI() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Weekly Report & Excel Dispatch Modal */}
+      <WeeklyReportModal
+        isOpen={showWeeklyModal}
+        onClose={() => setShowWeeklyModal(false)}
+      />
     </>
   );
 }
