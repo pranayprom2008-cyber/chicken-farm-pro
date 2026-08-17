@@ -42,7 +42,12 @@ import {
   Square,
   Clock,
   XCircle,
-  Pause
+  Pause,
+  Camera,
+  Image as ImageIcon,
+  Thermometer,
+  Eye,
+  ShoppingCart
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useFarmStore } from '@/store/useFarmStore';
@@ -83,6 +88,9 @@ export default function ChickAI() {
   const [waitingForField, setWaitingForField] = useState<'category' | 'batch' | 'amount' | null>(null);
   const [interruptedMessage, setInterruptedMessage] = useState<string | null>(null);
   const [lastAssistantResponse, setLastAssistantResponse] = useState<string | null>(null);
+
+  // Vision File Upload Ref
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Voice Engine State
   const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(() => {
@@ -127,12 +135,12 @@ export default function ChickAI() {
   const getContextualPrompts = () => {
     if (pathname.includes('/batches')) {
       return [
-        { label: '⚖️ Log 2.1kg Weight', query: 'Record average bird weight 2.1 kg for active batch' },
+        { label: '🔮 Forecast Batch', query: 'Predict profit and harvest forecast for active batch' },
+        { label: '📷 AI Vision Check', query: 'Analyze shed photo for flock distribution and weight' },
+        { label: '🌡️ Sensor Telemetry', query: 'Show shed environment sensor readings' },
         { label: '🌾 Calculate FCR', query: 'Calculate FCR for my active batch' },
         { label: '⏳ Days to Harvest', query: 'When is the harvest date for my active batch?' },
         { label: '🐔 Add 20 Dead Birds', query: 'Add 20 dead birds to active batch' },
-        { label: '🌽 500kg Feed Usage', query: 'Record 500 kg feed consumed for active batch' },
-        { label: '📈 Predict Profit', query: 'Predict profit for my active batch' },
       ];
     }
     if (pathname.includes('/expenses')) {
@@ -142,7 +150,6 @@ export default function ChickAI() {
         { label: '💊 Add ₹4000 Vaccine', query: 'Add ₹4,000 vaccination expense' },
         { label: '⚡ Add ₹5000 Electricity', query: 'Add ₹5,000 electricity expense' },
         { label: '🌾 Feed Expenses', query: 'How much did we spend on feed?' },
-        { label: '💸 Expense Trends', query: 'Which expenses are increasing?' },
       ];
     }
     if (pathname.includes('/revenue')) {
@@ -154,15 +161,14 @@ export default function ChickAI() {
       ];
     }
     return [
+      { label: '🌟 Executive Priorities', query: 'What should I worry about today?' },
+      { label: '🔮 Forecast Profit', query: 'Predict profit and harvest forecast for active batch' },
+      { label: '🌽 Feed Runway', query: 'How much feed is left and when will it run out?' },
+      { label: '📷 AI Vision Check', query: 'Analyze shed photo for flock distribution and weight' },
+      { label: '🌡️ Sensor Telemetry', query: 'Show shed environment sensor readings' },
       { label: '🌾 Calculate FCR', query: 'Calculate FCR for my active batch' },
-      { label: '🎯 Break-Even Price', query: 'What is my break-even price per kg?' },
-      { label: '⏳ Days to Harvest', query: 'When is harvest date?' },
       { label: '💰 Add ₹1000 Feed', query: 'Add ₹1,000 for feed' },
-      { label: '⛽ Add ₹2500 Diesel', query: 'Add ₹2,500 diesel expense' },
-      { label: '💧 Water Sanitation', query: 'What chlorine level should I use for drinking water?' },
-      { label: '☀️ Morning Farm Brief', query: 'What should I focus on today?' },
       { label: '📊 Weekly Excel Report', query: 'Generate weekly audit report for 9849852085 in Excel format' },
-      { label: '🏆 Farm AI Score', query: 'Calculate my Farm AI Score' },
     ];
   };
 
@@ -180,7 +186,7 @@ export default function ChickAI() {
     {
       id: 'welcome',
       sender: 'assistant',
-      text: `👋 **Welcome to ChickAI!** I am your intelligent Farm Copilot, connected in real-time to your poultry database.\n\nAsk me anything or issue direct commands like *"Add ₹1,000 for feed"*, *"Add 20 dead birds to Batch 45"*, or *"Change the ₹1000 feed expense to ₹1200"*.`,
+      text: `👋 **Welcome to ChickAI Farm Intelligence!** I am your intelligent Farm Operating System, connected in real-time to your telemetry, sensors, and database.\n\nAsk me anything, upload shed photos for AI Vision analysis, or issue natural voice commands like *"Add ₹1,000 for feed"*, *"What should I worry about today?"*, or *"Predict profit for active batch"*.`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -228,7 +234,6 @@ export default function ChickAI() {
       return;
     }
 
-    // If currently speaking, stop audio immediately upon user speaking
     if (voiceServiceRef.current.isSpeaking()) {
       voiceServiceRef.current.stop();
     }
@@ -263,7 +268,6 @@ export default function ChickAI() {
         const text = finalTranscript || interim;
         setVoiceTranscript(text);
 
-        // Immediate Barge-in: If speaking and any words detected, kill speech immediately!
         if (voiceServiceRef.current.isSpeaking()) {
           voiceServiceRef.current.stop();
         }
@@ -292,7 +296,7 @@ export default function ChickAI() {
 
   // Test Voice Persona
   const handleTestVoicePersona = () => {
-    const previewText = "Hi there! I'm ChickAI, your friendly farm copilot. All your flocks are doing great today. How can I help you?";
+    const previewText = "Good day. Farm intelligence telemetry is synced. All active flocks are performing within Cobb 500 parameters. How may I assist your operations?";
     voiceServiceRef.current.speak(previewText, voiceSettings);
   };
 
@@ -301,7 +305,7 @@ export default function ChickAI() {
     const nextMode = !activeVoiceMode;
     setActiveVoiceMode(nextMode);
     if (nextMode) {
-      const greeting = "Hi there! I'm ready to help with your farm. What would you like to check or record?";
+      const greeting = "Farm intelligence copilot online. Ready for your voice command.";
       voiceServiceRef.current.speak(greeting, voiceSettings, () => setConversationState('SPEAKING'), () => {
         if (voiceSettings.voiceCommands) startListening();
         else setConversationState('IDLE');
@@ -309,6 +313,20 @@ export default function ChickAI() {
     } else {
       handleStopSpeech();
     }
+  };
+
+  // Handle Photo / Image Upload for AI Vision Analysis
+  const handleImageSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result as string;
+      handleProcessTurn('Analyze this shed photo for flock distribution and weight', false, base64);
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
   };
 
   // Execute Confirmed Database Action
@@ -394,7 +412,7 @@ export default function ChickAI() {
             deadChicks: deadChicks || 0,
             feedConsumed: feedConsumed || 0,
             averageWeight: averageWeight || 0,
-            notes: 'Logged via ChickAI Voice Copilot',
+            notes: 'Logged via ChickAI Farm Copilot',
           });
         }
 
@@ -418,7 +436,22 @@ export default function ChickAI() {
           },
         ]);
       }
-      // 5. Create Sale
+      // 5. Create Feed Purchase Task
+      else if (proposal.type === 'create_feed_purchase') {
+        const { purchaseQuantityKg, priority, batchNumber } = proposal.details;
+        confirmationText = `✅ **Feed Procurement Task Created!**\n\n• **Order Quantity:** **${(purchaseQuantityKg || 2000).toLocaleString()} kg** Broiler Feed (~${Math.round((purchaseQuantityKg || 2000) / 50)} bags)\n• **Assigned:** Warehouse & Logistics\n• **Priority:** ${priority?.toUpperCase() || 'HIGH'}\n\n*Added to your farm daily operations backlog.*`;
+        spokenConfirmation = `Done! I've created the feed procurement task for ${purchaseQuantityKg} kilograms.`;
+
+        setActionHistory((prev) => [
+          {
+            id: `act-${Date.now()}`,
+            action: `Created Procurement: ${purchaseQuantityKg}kg Feed`,
+            target: batchNumber || 'Inventory Reserve',
+            timestamp: actionTime,
+          },
+        ]);
+      }
+      // 6. Create Sale
       else if (proposal.type === 'create_sale') {
         const { batchId, buyer, chickensSold, averageWeight, pricePerKg, totalRevenue, batchNumber } = proposal.details;
         await store.createSaleRecord({
@@ -442,7 +475,7 @@ export default function ChickAI() {
           },
         ]);
       }
-      // 6. Create Task
+      // 7. Create Task
       else if (proposal.type === 'create_task') {
         const { taskTitle, priority, batchNumber } = proposal.details;
         confirmationText = `✅ **Operational Task Scheduled!**\n\n• **Task:** ${taskTitle}\n• **Priority:** ${priority?.toUpperCase()}\n• **Target:** ${batchNumber}\n\n*Added to your farm daily agenda.*`;
@@ -489,16 +522,15 @@ export default function ChickAI() {
   };
 
   // Master Conversational Turn Processor
-  const handleProcessTurn = async (queryText?: string, isVoiceInitiated = false) => {
+  const handleProcessTurn = async (queryText?: string, isVoiceInitiated = false, attachedImage?: string) => {
     const text = (queryText || input).trim();
-    if (!text || loading) return;
+    if (!text && !attachedImage) return;
+    if (loading) return;
 
     const qLower = text.toLowerCase().trim();
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    // ==========================================================
-    // CLIENT FAST-PATH 1: STOP / INTERRUPTION COMMANDS
-    // ==========================================================
+    // Client Fast-Path: Stop / Interruption
     if (
       qLower === 'stop' ||
       qLower === 'stop speaking' ||
@@ -513,16 +545,13 @@ export default function ChickAI() {
     ) {
       handleStopSpeech();
       setInput('');
-      // Store current response as interrupted message so user can say "Continue"
       if (lastAssistantResponse) {
         setInterruptedMessage(lastAssistantResponse);
       }
       return;
     }
 
-    // ==========================================================
-    // CLIENT FAST-PATH 2: CONFIRMATION (YES)
-    // ==========================================================
+    // Client Fast-Path: Confirmation (YES)
     const isYes = [
       'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'okay', 'ok',
       'proceed', 'sure', 'save', 'please do', 'yes please', 'yes save it', 'yes do it'
@@ -541,9 +570,7 @@ export default function ChickAI() {
       return;
     }
 
-    // ==========================================================
-    // CLIENT FAST-PATH 3: CANCELLATION (NO)
-    // ==========================================================
+    // Client Fast-Path: Cancellation (NO)
     const isNo = [
       'no', 'nope', 'cancel', "don't", 'dont', 'never mind', 'nevermind', "don't do that",
       'forget it', "don't save", 'reject', 'abort', "no don't", 'actually no'
@@ -579,13 +606,11 @@ export default function ChickAI() {
       return;
     }
 
-    // ==========================================================
-    // STANDARD / BACKEND CONVERSATION ENGINE DISPATCH
-    // ==========================================================
+    // Standard Dispatch
     const userMsg: ChickAIMessage = {
       id: `user-${Date.now()}`,
       sender: 'user',
-      text,
+      text: text || '📷 Attached Shed Photo',
       timestamp: timeStr,
     };
 
@@ -618,10 +643,11 @@ export default function ChickAI() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: text,
+          message: text || 'Analyze this shed photo for flock distribution and weight',
           history: messages,
           clientContext,
           conversationContext: convContext,
+          attachedImage,
         }),
       });
 
@@ -638,13 +664,13 @@ export default function ChickAI() {
 
         if (data.speedAdjustment) {
           handleUpdateVoiceSettings({
-            speed: Math.max(0.8, Math.min(1.2, (voiceSettings.speed || 1.0) + data.speedAdjustment)),
+            speed: Math.max(0.8, Math.min(1.2, (voiceSettings.speed || 0.96) + data.speedAdjustment)),
           });
         }
 
         setMessages((prev) => [...prev, data.message]);
 
-        // Auto-Speak if enabled or in voice mode
+        // Auto-Speak
         if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {
           let spokenText = data.resumeAudioText || data.message.text;
           if (data.message.actionProposal && data.message.actionProposal.status === 'pending') {
@@ -731,7 +757,6 @@ export default function ChickAI() {
           onClick={() => setIsOpen(true)}
           className="relative group p-3.5 sm:px-5 sm:py-3.5 rounded-full bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 text-white font-bold text-sm shadow-xl shadow-emerald-700/30 flex items-center gap-2.5 border border-emerald-400/40 backdrop-blur-md cursor-pointer transition-all"
         >
-          {/* Subtle Ambient Pulse Ring */}
           <span className="absolute -inset-0.5 rounded-full bg-emerald-400/30 blur-xs group-hover:bg-emerald-400/50 animate-pulse pointer-events-none" />
 
           <div className="relative w-6 h-6 flex items-center justify-center">
@@ -743,7 +768,6 @@ export default function ChickAI() {
             ChickAI
           </span>
 
-          {/* Dynamic Alert Badge */}
           {hasBadge && (
             <span
               className={`relative px-1.5 py-0.5 rounded-full text-[10px] font-black leading-none ${
@@ -768,11 +792,11 @@ export default function ChickAI() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 rounded-3xl border border-emerald-500/30 bg-[#09130E]/90 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${
               isExpanded
-                ? 'w-[95vw] sm:w-[720px] h-[90vh] max-h-[850px]'
-                : 'w-[95vw] sm:w-[460px] h-[85vh] max-h-[680px]'
+                ? 'w-[95vw] sm:w-[760px] h-[92vh] max-h-[880px]'
+                : 'w-[95vw] sm:w-[480px] h-[85vh] max-h-[700px]'
             }`}
           >
-            {/* Ambient Background Aura */}
+            {/* Ambient Aura */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
@@ -787,11 +811,10 @@ export default function ChickAI() {
                     <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
                       ChickAI
                       <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
-                        Copilot
+                        Farm OS
                       </span>
                     </h3>
                   </div>
-                  {/* Real Conversational State Badge */}
                   <div className="flex items-center gap-1.5 mt-0.5">
                     <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold ${statusIndicator.color}`}>
                       {statusIndicator.text}
@@ -809,7 +832,7 @@ export default function ChickAI() {
                       ? 'bg-teal-500/30 text-teal-300 border border-teal-400/50 shadow-md shadow-teal-500/20 animate-pulse'
                       : 'hover:text-white hover:bg-white/10'
                   }`}
-                  title={activeVoiceMode ? 'Exit Voice Core Mode' : 'Enter Conversational Voice Mode'}
+                  title={activeVoiceMode ? 'Exit Voice Mode' : 'Enter Voice Copilot'}
                 >
                   <Radio className="w-4 h-4" />
                 </button>
@@ -818,7 +841,7 @@ export default function ChickAI() {
                 <button
                   onClick={() => setShowVoiceSettings(true)}
                   className="p-1.5 rounded-xl hover:text-white hover:bg-white/10 transition-all cursor-pointer"
-                  title="Voice Settings & Persona"
+                  title="Voice Persona & Settings"
                 >
                   <Volume2 className="w-4 h-4" />
                 </button>
@@ -964,7 +987,6 @@ export default function ChickAI() {
                       </span>
                     </div>
 
-                    {/* Active Batches Triage Summary */}
                     <div className="grid grid-cols-3 gap-2 text-center text-[11px]">
                       <div className="p-2.5 rounded-2xl bg-black/40 border border-emerald-500/20">
                         <span className="text-[9px] uppercase font-bold text-slate-400 block">Flock Population</span>
@@ -990,7 +1012,7 @@ export default function ChickAI() {
                       </button>
 
                       <span className="text-[10px] text-slate-400 italic">
-                        Real conversational AI active
+                        Farm Intelligence System active
                       </span>
                     </div>
                   </div>
@@ -1013,7 +1035,7 @@ export default function ChickAI() {
                       )}
 
                       <div
-                        className={`max-w-[85%] sm:max-w-[78%] rounded-3xl p-3.5 sm:p-4 space-y-2.5 shadow-md ${
+                        className={`max-w-[88%] sm:max-w-[80%] rounded-3xl p-3.5 sm:p-4 space-y-2.5 shadow-md ${
                           isUser
                             ? 'bg-emerald-600 text-white rounded-tr-xs'
                             : 'bg-[#102219]/90 border border-emerald-500/25 text-slate-100 rounded-tl-xs backdrop-blur-md'
@@ -1023,26 +1045,6 @@ export default function ChickAI() {
                         <div className="prose prose-invert prose-xs max-w-none leading-relaxed break-words font-sans">
                           <ReactMarkdown>{m.text}</ReactMarkdown>
                         </div>
-
-                        {/* Clarification Chips if AI is asking for missing slot */}
-                        {m.clarificationOptions && (
-                          <div className="pt-2 space-y-1.5">
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-teal-300 block">
-                              Select {m.clarificationOptions.field}:
-                            </span>
-                            <div className="flex flex-wrap gap-1.5">
-                              {m.clarificationOptions.options.map((opt: string, i: number) => (
-                                <button
-                                  key={i}
-                                  onClick={() => handleProcessTurn(`Set category as ${opt}`)}
-                                  className="px-2.5 py-1 rounded-xl bg-teal-950/80 hover:bg-teal-800 border border-teal-400/40 text-teal-200 text-[11px] font-bold transition-all active:scale-95 cursor-pointer shadow-sm"
-                                >
-                                  {opt}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
 
                         {/* Interactive Action Proposal Card */}
                         {m.actionProposal && (
@@ -1065,12 +1067,6 @@ export default function ChickAI() {
                                   <span className="font-bold text-white">₹ {m.actionProposal.details.amount.toLocaleString('en-IN')}</span>
                                 </div>
                               )}
-                              {m.actionProposal.details.oldAmount && (
-                                <div className="flex justify-between">
-                                  <span className="text-slate-400">Old Amount:</span>
-                                  <span className="line-through text-slate-400">₹ {m.actionProposal.details.oldAmount.toLocaleString('en-IN')}</span>
-                                </div>
-                              )}
                               {m.actionProposal.details.category && (
                                 <div className="flex justify-between">
                                   <span className="text-slate-400">Category:</span>
@@ -1081,6 +1077,12 @@ export default function ChickAI() {
                                 <div className="flex justify-between">
                                   <span className="text-slate-400">Flock:</span>
                                   <span className="font-bold text-amber-300">{m.actionProposal.details.batchNumber}</span>
+                                </div>
+                              )}
+                              {m.actionProposal.details.purchaseQuantityKg && (
+                                <div className="flex justify-between">
+                                  <span className="text-slate-400">Feed Quantity:</span>
+                                  <span className="font-bold text-amber-300">{m.actionProposal.details.purchaseQuantityKg.toLocaleString()} kg</span>
                                 </div>
                               )}
                             </div>
@@ -1106,38 +1108,61 @@ export default function ChickAI() {
                           </div>
                         )}
 
-                        {/* Printable Batch Report Card */}
-                        {m.reportData && (
-                          <div className="p-4 rounded-2xl bg-black/50 border border-cyan-500/30 text-white space-y-3">
-                            <div className="flex items-center justify-between pb-2 border-b border-white/10">
-                              <span className="font-bold text-cyan-300 text-xs">
-                                📄 {m.reportData.batchNumber} Executive Overview
+                        {/* Vision Analysis Interactive Card */}
+                        {m.visionData && (
+                          <div className="p-3.5 rounded-2xl bg-black/60 border border-teal-500/40 text-white space-y-2.5 mt-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                              <span className="font-bold text-teal-300 text-xs flex items-center gap-1.5">
+                                <Eye className="w-3.5 h-3.5 text-teal-400" />
+                                AI Vision Biometric Survey
                               </span>
-                              <button
-                                onClick={() => window.print()}
-                                className="px-2.5 py-1 rounded-lg bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-bold flex items-center gap-1 hover:bg-cyan-500/30 cursor-pointer"
-                              >
-                                <Printer className="w-3 h-3" />
-                                <span>Print / PDF</span>
-                              </button>
+                              <span className="text-[10px] font-mono text-emerald-400">
+                                {m.visionData.confidenceScore}% Confidence
+                              </span>
                             </div>
-
                             <div className="grid grid-cols-2 gap-2 text-[11px]">
                               <div className="p-2 rounded-xl bg-white/5">
-                                <span className="text-slate-400 block text-[9px] uppercase">Started Flock</span>
-                                <span className="font-bold">{m.reportData.started.toLocaleString()} birds</span>
+                                <span className="text-slate-400 block text-[9px] uppercase">Surveilled Birds</span>
+                                <span className="font-bold">~{m.visionData.approximateBirdCount}</span>
                               </div>
                               <div className="p-2 rounded-xl bg-white/5">
-                                <span className="text-slate-400 block text-[9px] uppercase">Alive Count</span>
-                                <span className="font-bold text-emerald-400">{m.reportData.alive.toLocaleString()} birds</span>
+                                <span className="text-slate-400 block text-[9px] uppercase">Distribution</span>
+                                <span className="font-bold text-teal-300">{m.visionData.flockDistribution}</span>
                               </div>
                               <div className="p-2 rounded-xl bg-white/5">
-                                <span className="text-slate-400 block text-[9px] uppercase">Total Cost</span>
-                                <span className="font-bold">₹ {m.reportData.totalCost.toLocaleString('en-IN')}</span>
+                                <span className="text-slate-400 block text-[9px] uppercase">Activity Status</span>
+                                <span className="font-bold text-emerald-400">{m.visionData.activityLevel}</span>
                               </div>
                               <div className="p-2 rounded-xl bg-white/5">
-                                <span className="text-slate-400 block text-[9px] uppercase">Est. Net Profit</span>
-                                <span className="font-bold text-emerald-400">₹ {m.reportData.profit.toLocaleString('en-IN')}</span>
+                                <span className="text-slate-400 block text-[9px] uppercase">Visual Avg Weight</span>
+                                <span className="font-bold">{m.visionData.estimatedAvgWeightKg} kg</span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Sensor Telemetry Card */}
+                        {m.sensorData && (
+                          <div className="p-3.5 rounded-2xl bg-black/60 border border-amber-500/30 text-white space-y-2 mt-2">
+                            <div className="flex items-center justify-between pb-1.5 border-b border-white/10">
+                              <span className="font-bold text-amber-300 text-xs flex items-center gap-1.5">
+                                <Thermometer className="w-3.5 h-3.5 text-amber-400" />
+                                Shed Environment Telemetry
+                              </span>
+                              <span className="text-[10px] text-slate-400">{m.sensorData.lastUpdated}</span>
+                            </div>
+                            <div className="grid grid-cols-3 gap-1.5 text-[11px] text-center">
+                              <div className="p-2 rounded-xl bg-white/5">
+                                <span className="text-slate-400 block text-[9px] uppercase">Temp</span>
+                                <span className="font-bold text-emerald-400">{m.sensorData.temperatureC}°C</span>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white/5">
+                                <span className="text-slate-400 block text-[9px] uppercase">Humidity</span>
+                                <span className="font-bold">{m.sensorData.humidityPct}%</span>
+                              </div>
+                              <div className="p-2 rounded-xl bg-white/5">
+                                <span className="text-slate-400 block text-[9px] uppercase">Ammonia</span>
+                                <span className="font-bold text-emerald-400">{m.sensorData.ammoniaPpm} ppm</span>
                               </div>
                             </div>
                           </div>
@@ -1195,7 +1220,7 @@ export default function ChickAI() {
                     className="flex items-center gap-2 p-3 rounded-2xl bg-[#102219]/70 border border-emerald-500/20 text-emerald-300 text-xs w-fit"
                   >
                     <Sparkles className="w-4 h-4 animate-spin text-amber-300" />
-                    <span>ChickAI is processing farm response...</span>
+                    <span>ChickAI is computing farm intelligence...</span>
                     <span className="flex gap-1">
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce" />
                       <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-bounce [animation-delay:0.2s]" />
@@ -1208,7 +1233,7 @@ export default function ChickAI() {
               </div>
             )}
 
-            {/* Input Bar with Voice Recognition Mic & State-Responsive Controls */}
+            {/* Input Bar with Photo/Vision Upload, Voice Mic, and Send */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -1216,6 +1241,26 @@ export default function ChickAI() {
               }}
               className="p-3.5 border-t border-emerald-500/20 bg-black/45 flex items-center gap-2 flex-shrink-0"
             >
+              {/* Hidden file input for camera/image analysis */}
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept="image/*"
+                className="hidden"
+                onChange={handleImageSelected}
+              />
+
+              {/* Camera / Vision Upload Button */}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="p-2.5 rounded-2xl bg-[var(--bg-input)] hover:bg-teal-500/20 border border-teal-500/30 text-teal-400 transition-all cursor-pointer"
+                title="Upload Shed/Flock Photo for AI Vision Analysis"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+
+              {/* Voice / Mic Button */}
               {conversationState === 'SPEAKING' ? (
                 <button
                   type="button"
@@ -1251,7 +1296,7 @@ export default function ChickAI() {
                     ? '🔴 Listening to your voice...'
                     : conversationState === 'WAITING_FOR_CONFIRMATION'
                     ? 'Say "Yes" to confirm or "Cancel" to discard...'
-                    : 'Ask or speak to ChickAI (e.g. Add ₹1,000 for feed)...'
+                    : 'Ask or command ChickAI (e.g. Add ₹1,000 for feed)...'
                 }
                 disabled={loading}
                 className="flex-1 px-4 py-2.5 rounded-2xl bg-[var(--bg-input)] border border-emerald-500/30 text-white placeholder-slate-400 text-xs focus:outline-none focus:border-emerald-400 transition-all"

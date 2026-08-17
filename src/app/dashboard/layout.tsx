@@ -9,7 +9,6 @@ import LiquidBackground from '@/components/LiquidBackground';
 import PageTransition from '@/components/PageTransition';
 import MobileNav from '@/components/MobileNav';
 import ChickAI from '@/components/ChickAI';
-import FloatingChicks from '@/components/FloatingChicks';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const { user, theme, isAuthenticated, syncAll } = useFarmStore();
@@ -62,7 +61,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 relative">
       <LiquidBackground />
-      <FloatingChicks />
       <Sidebar />
       <div className="flex-1 flex flex-col relative z-10 overflow-hidden min-w-0">
         <Header />

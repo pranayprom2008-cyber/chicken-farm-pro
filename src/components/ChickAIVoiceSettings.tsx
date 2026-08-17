@@ -59,10 +59,10 @@ export default function ChickAIVoiceSettings({
           </label>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { id: 'friendly-assistant', label: '🌟 Friendly Assistant', desc: 'Warm, natural & helpful (Default)' },
-              { id: 'friendly-female', label: '👩 Friendly Female', desc: 'Approachable & smooth' },
-              { id: 'friendly-male', label: '👨 Friendly Male', desc: 'Conversational & relaxed' },
-              { id: 'professional-clear', label: '👔 Professional Clear', desc: 'Crisp, polite & direct' },
+              { id: 'futuristic-male', label: '🌌 Futuristic AI Core', desc: 'Calm, deep, smooth & intelligent (Default)' },
+              { id: 'professional-female', label: '👩 Executive Advisor', desc: 'Smooth, clear & professional' },
+              { id: 'friendly-male', label: '👨 Senior Farm Specialist', desc: 'Conversational & relaxed' },
+              { id: 'professional-clear', label: '👔 Crisp Commercial', desc: 'Direct, clear & concise' },
             ].map((p) => {
               const isSelected = settings.voicePersona === p.id;
               return (

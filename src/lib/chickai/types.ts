@@ -1,3 +1,7 @@
+// ==========================================
+// CHICKAI FARM INTELLIGENCE SYSTEM TYPES
+// ==========================================
+
 export interface FarmAIScore {
   overall: number; // 0 - 100
   batchHealth: number; // 0 - 100
@@ -27,6 +31,10 @@ export interface ProactiveAlert {
   batchNumber?: string;
   batchId?: string;
   metric?: string;
+  whatChanged?: string;
+  differencePct?: string;
+  comparedWith?: string;
+  whyItMatters?: string;
   recommendation: string;
   timestamp: string;
 }
@@ -39,6 +47,7 @@ export interface HistoricalBaselines {
   avgProfitPerBatch: number;
   avgHarvestWeightKg: number;
   sampleBatchesCount: number;
+  avgDailyFeedKg: number;
 }
 
 export interface AIActionHistoryItem {
@@ -52,7 +61,16 @@ export interface AIActionHistoryItem {
 }
 
 export interface ActionProposal {
-  type: 'create_expense' | 'update_expense' | 'delete_expense' | 'update_batch' | 'add_mortality' | 'create_sale' | 'create_task' | 'filter_batches';
+  type:
+    | 'create_expense'
+    | 'update_expense'
+    | 'delete_expense'
+    | 'update_batch'
+    | 'add_mortality'
+    | 'create_sale'
+    | 'create_task'
+    | 'filter_batches'
+    | 'create_feed_purchase';
   title: string;
   details: {
     expenseId?: string;
@@ -66,16 +84,83 @@ export interface ActionProposal {
     date?: string;
     deadChicks?: number;
     aliveChicks?: number;
+    feedConsumed?: number;
+    averageWeight?: number;
     buyer?: string;
     pricePerKg?: number;
     chickensSold?: number;
+    totalRevenue?: number;
     taskTitle?: string;
     priority?: 'low' | 'medium' | 'high';
+    purchaseQuantityKg?: number;
     filterKey?: string;
     filterValue?: any;
     [key: string]: any;
   };
   status: 'pending' | 'confirmed' | 'cancelled';
+}
+
+export interface VisionAnalysisResult {
+  imageUrl?: string;
+  approximateBirdCount: number;
+  flockDistribution: 'Uniform' | 'Clustered' | 'Crowded near Feeders' | 'Crowded near Heat';
+  activityLevel: 'High / Active' | 'Normal' | 'Low / Inactive Observed';
+  deadOrInactiveVisible: number;
+  estimatedAvgWeightKg: number;
+  confidenceScore: number;
+  environmentalObservations: string[];
+  observations: string[];
+  disclaimer: string;
+}
+
+export interface WeightEstimationResult {
+  batchNumber: string;
+  ageInDays: number;
+  expectedTargetWeightKg: number;
+  estimatedWeightKg: number;
+  deviationPct: number;
+  status: 'Target Reached' | 'Slight Lag' | 'Underweight Alert';
+  recommendation: string;
+  confidenceScore: number;
+}
+
+export interface SensorDataSnapshot {
+  shedId: string;
+  temperatureC: number;
+  targetTempRange: [number, number];
+  humidityPct: number;
+  targetHumidityRange: [number, number];
+  ammoniaPpm: number;
+  co2Ppm: number;
+  waterConsumptionLitersDay: number;
+  lightIntensityLux: number;
+  ventilationStatus: 'Optimal' | 'High Heat Stress' | 'High Ammonia Warning';
+  lastUpdated: string;
+}
+
+export interface BatchForecastResult {
+  batchNumber: string;
+  expectedFinalBirds: number;
+  expectedMortalityPct: number;
+  expectedFinalWeightKg: number;
+  remainingFeedKg: number;
+  finalFeedCost: number;
+  finalExpenses: number;
+  expectedGrossRevenue: number;
+  expectedNetProfit: number;
+  profitMarginPct: number;
+  expectedCompletionDate: string;
+  confidencePct: number;
+}
+
+export interface InventoryForecastResult {
+  currentFeedStockKg: number;
+  dailyConsumptionKg: number;
+  daysRemaining: number;
+  depletionDate: string;
+  requiredBatchFeedKg: number;
+  recommendedPurchaseKg: number;
+  urgency: 'normal' | 'attention' | 'critical';
 }
 
 export interface ChickAIMessage {
@@ -108,6 +193,11 @@ export interface ChickAIMessage {
   simulationData?: WhatIfSimulationResult;
   scoreData?: FarmAIScore;
   alertsData?: ProactiveAlert[];
+  visionData?: VisionAnalysisResult;
+  weightData?: WeightEstimationResult;
+  sensorData?: SensorDataSnapshot;
+  forecastData?: BatchForecastResult;
+  inventoryData?: InventoryForecastResult;
 }
 
 export interface FarmContextSnapshot {
@@ -149,6 +239,10 @@ export type UserIntent =
   | 'GENERAL_CONVERSATION'
   | 'HELP'
   | 'CHANGE_REQUEST'
+  | 'VISION_ANALYSIS'
+  | 'SENSOR_QUERY'
+  | 'FORECAST_QUERY'
+  | 'SIMULATION_QUERY'
   | 'UNKNOWN';
 
 export interface ConversationContext {
