@@ -86,6 +86,8 @@ export default function ChickAI() {
   const [actionHistory, setActionHistory] = useState<AIActionHistoryItem[]>([]);
   const [sessionMemory, setSessionMemory] = useState<VoiceSessionMemory>({});
   const executedTxRef = useRef<Set<string>>(new Set());
+  const silenceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const speechProcessedRef = useRef(false);
 
   // Conversational State Machine
   const [conversationState, setConversationState] = useState<ConversationState>('IDLE');
@@ -230,7 +232,7 @@ export default function ChickAI() {
     setVoiceTranscript('');
   }, []);
 
-  // Continuous / Interactive Speech Recognition with Barge-in
+  // Continuous / Interactive Speech Recognition with Barge-in & Robust Fallbacks
   const startListening = useCallback(() => {
     if (typeof window === 'undefined') return;
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -244,6 +246,12 @@ export default function ChickAI() {
     }
 
     try {
+      if (silenceTimerRef.current) {
+        clearTimeout(silenceTimerRef.current);
+        silenceTimerRef.current = null;
+      }
+      speechProcessedRef.current = false;
+
       if (recognitionRef.current) {
         try {
           recognitionRef.current.abort();
@@ -251,9 +259,12 @@ export default function ChickAI() {
       }
 
       const recognition = new SpeechRecognition();
-      recognition.continuous = false;
+      recognition.continuous = true;
       recognition.interimResults = true;
-      recognition.lang = 'en-IN';
+      recognition.maxAlternatives = 1;
+      recognition.lang = (typeof navigator !== 'undefined' && navigator.language) || 'en-IN';
+
+      let accumulatedText = '';
 
       recognition.onstart = () => {
         setConversationState('LISTENING');
@@ -263,38 +274,57 @@ export default function ChickAI() {
       recognition.onresult = (event: any) => {
         let interim = '';
         let finalTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
+        for (let i = 0; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
-            finalTranscript += event.results[i][0].transcript;
+            finalTranscript += event.results[i][0].transcript + ' ';
           } else {
             interim += event.results[i][0].transcript;
           }
         }
-        const text = finalTranscript || interim;
-        setVoiceTranscript(text);
+        const text = (finalTranscript + interim).trim();
+        if (text) {
+          accumulatedText = text;
+          setVoiceTranscript(text);
+          setInput(text);
 
-        if (voiceServiceRef.current.isSpeaking()) {
-          voiceServiceRef.current.stop();
-        }
+          if (voiceServiceRef.current.isSpeaking()) {
+            voiceServiceRef.current.stop();
+          }
 
-        if (finalTranscript) {
-          handleProcessTurn(finalTranscript.trim(), true);
+          // Debounced auto-submit after speech pause (1200ms of silence)
+          if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
+          silenceTimerRef.current = setTimeout(() => {
+            if (!speechProcessedRef.current && accumulatedText.trim()) {
+              speechProcessedRef.current = true;
+              try { recognition.stop(); } catch {}
+              handleProcessTurn(accumulatedText.trim(), true);
+            }
+          }, 1200);
         }
       };
 
       recognition.onerror = (e: any) => {
-        console.warn('Voice notice:', e);
-        setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
+        console.warn('Speech recognition notice:', e.error || e);
+        if (e.error === 'no-speech' || e.error === 'network') {
+          // Graceful handling without breaking
+        } else {
+          setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
+        }
       };
 
       recognition.onend = () => {
-        setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
+        if (!speechProcessedRef.current && accumulatedText.trim()) {
+          speechProcessedRef.current = true;
+          handleProcessTurn(accumulatedText.trim(), true);
+        } else {
+          setConversationState((prev) => (prev === 'LISTENING' ? 'IDLE' : prev));
+        }
       };
 
       recognitionRef.current = recognition;
       recognition.start();
     } catch (err) {
-      console.error(err);
+      console.error('Speech recognition error:', err);
       setConversationState('IDLE');
     }
   }, [pendingAction, voiceSettings, lastAssistantResponse, interruptedMessage]);
