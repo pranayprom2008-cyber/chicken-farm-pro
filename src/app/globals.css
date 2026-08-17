@@ -23,7 +23,6 @@
   --badge-yellow: #FEF08A;
   --badge-yellow-text: #854D0E;
 
-  /* Spatial tokens in light mode */
   --spatial-glass-bg: rgba(255, 255, 255, 0.85);
   --spatial-glass-border: rgba(20, 40, 28, 0.08);
   --spatial-glass-highlight: rgba(255, 255, 255, 0.95);
@@ -53,7 +52,6 @@
   --badge-yellow: rgba(234, 179, 8, 0.15);
   --badge-yellow-text: #FDE047;
 
-  /* Spatial tokens in dark mode */
   --spatial-glass-bg: rgba(19, 36, 28, 0.85);
   --spatial-glass-border: #1C382B;
   --spatial-glass-highlight: rgba(255, 255, 255, 0.1);
@@ -85,7 +83,6 @@
   --neon-cyan: #06B6D4;
   --neon-emerald: #10B981;
 
-  /* Spatial tokens in liquid mode */
   --spatial-glass-bg: rgba(14, 20, 36, 0.6);
   --spatial-glass-border: rgba(255, 255, 255, 0.09);
   --spatial-glass-highlight: rgba(255, 255, 255, 0.15);
@@ -94,32 +91,32 @@
 
 /* ── 4. Spatial Glass Theme (Apple Vision Pro / visionOS Spatial UI) ─────── */
 .spatial, .spatial-glass {
-  --bg-primary: #0A0D14;
-  --bg-secondary: #0F131D;
-  --bg-card: rgba(24, 28, 40, 0.58);
-  --bg-card-hover: rgba(32, 38, 54, 0.72);
-  --bg-input: rgba(18, 22, 34, 0.75);
-  --bg-sidebar: rgba(14, 18, 28, 0.78);
-  --bg-header: rgba(14, 18, 28, 0.75);
+  --bg-primary: #080B11;
+  --bg-secondary: #0E131E;
+  --bg-card: rgba(22, 28, 42, 0.52);
+  --bg-card-hover: rgba(30, 38, 58, 0.68);
+  --bg-input: rgba(16, 22, 34, 0.65);
+  --bg-sidebar: rgba(12, 16, 26, 0.65);
+  --bg-header: rgba(12, 16, 26, 0.62);
   --text-primary: #FFFFFF;
-  --text-secondary: #A0ABC0;
+  --text-secondary: #CBD5E1;
   --text-muted: #64748B;
-  --border-color: rgba(255, 255, 255, 0.12);
-  --border-hover: rgba(255, 255, 255, 0.28);
-  --shadow-color: rgba(0, 0, 0, 0.7);
-  --shadow-lg: 0 28px 70px -12px rgba(0, 0, 0, 0.85);
+  --border-color: rgba(255, 255, 255, 0.14);
+  --border-hover: rgba(255, 255, 255, 0.35);
+  --shadow-color: rgba(0, 0, 0, 0.8);
+  --shadow-lg: 0 32px 85px -15px rgba(0, 0, 0, 0.95);
   --accent-color: #38BDF8;
-  --accent-glow: rgba(56, 189, 248, 0.3);
-  --card-blur: blur(28px);
-  --card-bg-glass: rgba(24, 28, 40, 0.58);
-  --badge-yellow: rgba(245, 158, 11, 0.2);
+  --accent-glow: rgba(56, 189, 248, 0.4);
+  --card-blur: blur(36px);
+  --card-bg-glass: rgba(22, 28, 42, 0.52);
+  --badge-yellow: rgba(245, 158, 11, 0.25);
   --badge-yellow-text: #FCD34D;
 
-  /* VisionOS Pure Spatial Glass Tokens */
-  --spatial-glass-bg: rgba(24, 28, 40, 0.55);
-  --spatial-glass-border: rgba(255, 255, 255, 0.14);
-  --spatial-glass-highlight: rgba(255, 255, 255, 0.22);
-  --spatial-shadow-deep: 0 30px 80px -15px rgba(0, 0, 0, 0.9), 0 0 1px 1px rgba(255, 255, 255, 0.08);
+  /* VisionOS Pure Optical Glass Tokens */
+  --spatial-glass-bg: rgba(20, 26, 40, 0.52);
+  --spatial-glass-border: rgba(255, 255, 255, 0.16);
+  --spatial-glass-highlight: rgba(255, 255, 255, 0.32);
+  --spatial-shadow-deep: 0 32px 85px -15px rgba(0, 0, 0, 0.92), 0 0 1px 1px rgba(255, 255, 255, 0.14);
 }
 
 /* ── Base Styles ──────────────────────────────────────────────────────── */
@@ -169,7 +166,7 @@ body {
   box-shadow: 0 18px 45px rgba(0, 0, 0, 0.65), 0 0 24px var(--accent-glow), inset 0 1px 0 rgba(255, 255, 255, 0.15);
 }
 
-/* ── CORE SPATIAL GLASS MATERIAL (VisionOS Style) ─────────────────────── */
+/* ── CORE SPATIAL GLASS MATERIAL (VisionOS Optical Glass) ─────────────── */
 .spatial-glass {
   background: var(--spatial-glass-bg);
   backdrop-filter: var(--card-blur);
@@ -183,14 +180,14 @@ body {
 
 .spatial-glass-elevated {
   background: var(--bg-card);
-  backdrop-filter: blur(32px);
-  -webkit-backdrop-filter: blur(32px);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
   border: 1px solid var(--spatial-glass-highlight);
-  box-shadow: 0 35px 90px -15px rgba(0, 0, 0, 0.92), inset 0 1px 0 0 rgba(255, 255, 255, 0.26);
-  border-radius: 2rem;
+  box-shadow: 0 38px 95px -15px rgba(0, 0, 0, 0.95), inset 0 1px 0 0 rgba(255, 255, 255, 0.38), inset 0 0 0 1px rgba(255, 255, 255, 0.12);
+  border-radius: 2.25rem;
 }
 
-/* ── SPATIAL INTERACTIVE CARD ─────────────────────────────────────────── */
+/* ── SPATIAL INTERACTIVE CARD (VisionOS Floating Card) ────────────────── */
 .spatial-card {
   position: relative;
   background: var(--spatial-glass-bg);
@@ -207,54 +204,53 @@ body {
 }
 
 .spatial-card:hover {
-  transform: translateY(-4px);
+  transform: translateY(-5px);
   border-color: var(--border-hover);
-  box-shadow: 0 30px 75px -12px rgba(0, 0, 0, 0.85),
-              0 0 24px -2px var(--accent-glow),
-              inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+  box-shadow: 0 32px 80px -10px rgba(0, 0, 0, 0.9),
+              0 0 28px -2px var(--accent-glow),
+              inset 0 1px 0 0 rgba(255, 255, 255, 0.45);
 }
 
-/* ── SPATIAL ACTIVE PILL (Sidebar & Category Filters) ─────────────────── */
+/* ── SPATIAL ACTIVE PILL (VisionOS Rounded Glass Pill) ────────────────── */
 .spatial-pill {
   position: relative;
-  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(16, 185, 129, 0.15));
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 8px 24px -4px rgba(56, 189, 248, 0.25), inset 0 1px 0 0 rgba(255, 255, 255, 0.28);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  box-shadow: 0 10px 28px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.4);
   border-radius: 1.25rem;
 }
 
-/* ── TACTILE SPATIAL GLASS BUTTONS ────────────────────────────────────── */
+/* ── TACTILE VISIONOS GLASS BUTTONS ──────────────────────────────────── */
 .spatial-btn-primary {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border-radius: 1.25rem;
-  font-weight: 700;
+  padding: 0.65rem 1.35rem;
+  border-radius: 1.5rem;
+  font-weight: 800;
   font-size: 0.8125rem;
-  color: #FFFFFF;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95), rgba(220, 230, 242, 0.9));
   color: #0A0D14;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.9);
+  background: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12px 30px -4px rgba(0, 0, 0, 0.5), 0 0 15px rgba(255, 255, 255, 0.2), inset 0 1px 0 0 #FFFFFF;
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
   transform: translate3d(0, 0, 0);
 }
 
 .spatial-btn-primary:hover {
-  transform: translateY(-2px);
-  background: #FFFFFF;
-  box-shadow: 0 14px 32px -4px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 #FFFFFF;
+  transform: translateY(-2px) scale(1.02);
+  background: #F8FAFC;
+  box-shadow: 0 16px 36px -4px rgba(0, 0, 0, 0.65), 0 0 20px rgba(255, 255, 255, 0.35), inset 0 1px 0 0 #FFFFFF;
 }
 
 .spatial-btn-primary:active {
-  transform: translateY(1px);
-  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.3);
+  transform: translateY(1px) scale(0.98);
+  box-shadow: 0 4px 12px -2px rgba(0, 0, 0, 0.4);
 }
 
 .spatial-btn-secondary {
@@ -263,54 +259,55 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-  padding: 0.625rem 1.25rem;
-  border-radius: 1.25rem;
+  padding: 0.65rem 1.35rem;
+  border-radius: 1.5rem;
   font-weight: 700;
   font-size: 0.8125rem;
-  color: var(--text-primary);
-  background: var(--spatial-glass-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid var(--spatial-glass-border);
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3), inset 0 1px 0 0 var(--spatial-glass-highlight);
+  color: #FFFFFF;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.35);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   cursor: pointer;
 }
 
 .spatial-btn-secondary:hover {
-  transform: translateY(-2px);
-  border-color: var(--border-hover);
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45), inset 0 1px 0 0 rgba(255, 255, 255, 0.28);
+  transform: translateY(-2px) scale(1.02);
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.55), inset 0 1px 0 0 rgba(255, 255, 255, 0.5);
 }
 
 /* ── SPATIAL ALERTS & STATUS CAPSULES ─────────────────────────────────── */
 .spatial-alert-critical {
-  background: linear-gradient(135deg, rgba(225, 29, 72, 0.16), rgba(159, 18, 57, 0.08));
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(244, 63, 94, 0.4);
-  box-shadow: 0 16px 40px -8px rgba(225, 29, 72, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.2), rgba(159, 18, 57, 0.1));
+  backdrop-filter: blur(28px);
+  border: 1px solid rgba(244, 63, 94, 0.5);
+  box-shadow: 0 18px 45px -8px rgba(225, 29, 72, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
 }
 
 .spatial-alert-warning {
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(180, 83, 9, 0.08));
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(245, 158, 11, 0.4);
-  box-shadow: 0 16px 40px -8px rgba(245, 158, 11, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(180, 83, 9, 0.1));
+  backdrop-filter: blur(28px);
+  border: 1px solid rgba(245, 158, 11, 0.5);
+  box-shadow: 0 18px 45px -8px rgba(245, 158, 11, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
 }
 
 .spatial-alert-healthy {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.16), rgba(13, 148, 136, 0.08));
-  backdrop-filter: blur(24px);
-  border: 1px solid rgba(52, 211, 153, 0.4);
-  box-shadow: 0 16px 40px -8px rgba(16, 185, 129, 0.3), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(13, 148, 136, 0.1));
+  backdrop-filter: blur(28px);
+  border: 1px solid rgba(52, 211, 153, 0.5);
+  box-shadow: 0 18px 45px -8px rgba(16, 185, 129, 0.35), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
 }
 
 /* ── SPATIAL GRID & ATMOSPHERIC PARTICLES ─────────────────────────────── */
 .spatial-grid-canvas {
-  background-size: 44px 44px;
+  background-size: 48px 48px;
   background-image: 
-    linear-gradient(to right, rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(to bottom, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+    linear-gradient(to right, rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
 }
 
 /* ── Ambient Background Animations ────────────────────────────────────── */

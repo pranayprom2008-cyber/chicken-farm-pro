@@ -27,7 +27,13 @@ import {
   ChevronRight,
   Send,
   Receipt,
-  Bot
+  Bot,
+  Play,
+  Download,
+  Flame,
+  CheckCircle2,
+  SlidersHorizontal,
+  Compass
 } from 'lucide-react';
 import Link from 'next/link';
 import {
@@ -86,6 +92,7 @@ export default function DashboardPage() {
     batches,
     user,
     settings,
+    theme,
     loading,
     error,
     fetchDashboardData,
@@ -94,6 +101,7 @@ export default function DashboardPage() {
 
   const [mounted, setMounted] = useState(false);
   const [showWhatsAppModal, setShowWhatsAppModal] = useState(false);
+  const [activeCategoryTab, setActiveCategoryTab] = useState('flocks');
 
   useEffect(() => {
     setMounted(true);
@@ -101,6 +109,7 @@ export default function DashboardPage() {
     fetchBatches();
   }, [fetchDashboardData, fetchBatches]);
 
+  const isSpatial = theme === 'spatial' || theme === 'spatial-glass';
   const currency = settings?.currency || '₹';
 
   const formatMoney = (val: number) => {
@@ -114,6 +123,8 @@ export default function DashboardPage() {
     if (hour < 17) return `GOOD AFTERNOON, ${name}`;
     return `GOOD EVENING, ${name}`;
   };
+
+  const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
 
   // Top 4 Primary Spatial Cards
   const coreStats = [
@@ -211,6 +222,14 @@ export default function DashboardPage() {
     { label: '✨ Ask ChickAI', href: '#', icon: Bot, isChickAI: true },
   ];
 
+  const categoryPills = [
+    { id: 'flocks', label: 'Commercial Flocks' },
+    { id: 'feed', label: 'Feed Runway' },
+    { id: 'margins', label: 'Farm Margins' },
+    { id: 'sensors', label: 'Bio-Sensors' },
+    { id: 'growth', label: 'Growth Curves' },
+  ];
+
   const pieData = [
     { name: 'Feed', value: stats?.categoryExpenses.feed || 1, color: '#10B981' },
     { name: 'Medicine', value: stats?.categoryExpenses.medicine || 0, color: '#8B5CF6' },
@@ -232,92 +251,110 @@ export default function DashboardPage() {
   if (!mounted) return null;
 
   return (
-    <div className="space-y-8 pb-10">
-      {/* ── Spatial Header & Operational Greeting ── */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono tracking-widest text-emerald-400 font-bold uppercase">
-              {getGreeting()}
-            </span>
-            <span className="flex h-2 w-2 relative">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-            </span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight mt-0.5">
-            Farm Overview
-          </h1>
-          <p className="text-xs text-[var(--text-muted)] font-medium mt-0.5">
-            Real-time biometric data & financial telemetry • Spatial Glass OS
-          </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap">
-          <button
-            onClick={() => setShowWhatsAppModal(true)}
-            className="spatial-btn-primary cursor-pointer text-xs"
-            title="Dispatch 1-Click WhatsApp Daily Briefing"
-          >
-            <Send className="w-4 h-4" />
-            <span>WhatsApp Dispatch</span>
-          </button>
-
-          <button
-            onClick={() => fetchDashboardData()}
-            disabled={loading}
-            className="p-2.5 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-all cursor-pointer hover:scale-105"
-            title="Refresh database records"
-          >
-            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-          </button>
-
-          <Link
-            href="/dashboard/batches"
-            className="spatial-btn-secondary text-xs font-bold"
-          >
-            <Plus className="w-4 h-4 text-emerald-400" />
-            <span>New Batch</span>
-          </Link>
-        </div>
+    <div className="space-y-7 pb-12">
+      {/* ── VisionOS Spatial Category Filter Pills (Matches Reference UI) ── */}
+      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        {categoryPills.map((pill) => {
+          const isActive = activeCategoryTab === pill.id;
+          return (
+            <button
+              key={pill.id}
+              onClick={() => setActiveCategoryTab(pill.id)}
+              className={`px-4 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                isActive
+                  ? 'bg-white text-black shadow-lg shadow-white/10 scale-102'
+                  : 'bg-white/10 hover:bg-white/15 text-white/80 hover:text-white border border-white/10'
+              }`}
+            >
+              {pill.label}
+            </button>
+          );
+        })}
       </div>
 
-      {error && (
-        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center justify-between text-xs">
-          <span>Connection notice: {error}</span>
-          <button
-            onClick={() => fetchDashboardData()}
-            className="px-3 py-1 bg-red-500 text-white rounded-xl font-semibold cursor-pointer"
-          >
-            Retry
-          </button>
-        </div>
-      )}
+      {/* ── visionOS Cinematic Spatial Hero Spotlight Card (Matches Reference UI) ── */}
+      <TiltCard maxTilt={3.5} glare={true}>
+        <div className="relative rounded-[2.25rem] overflow-hidden spatial-glass-elevated p-6 sm:p-8 bg-gradient-to-r from-sky-950/40 via-emerald-950/30 to-black/60 border border-white/15 shadow-2xl">
+          {/* Ambient Background Ray */}
+          <div className="absolute top-0 right-0 w-[450px] h-[300px] bg-sky-500/10 rounded-full blur-3xl pointer-events-none" />
+          <div className="absolute bottom-0 left-0 w-[350px] h-[250px] bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* ── 4 Core Spatial Glass Metric Cards with 3D Parallax Tilt ── */}
+          <div className="relative z-10 max-w-2xl space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-bold backdrop-blur-md">
+                <Flame className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>Active Commercial Grow-Out</span>
+              </span>
+              <span className="text-xs text-white/60 font-mono">
+                {stats?.aliveChicks.toLocaleString()} Birds Active
+              </span>
+            </div>
+
+            <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
+              {activeBatch ? `${activeBatch.batchNumber} • ${activeBatch.breedType}` : 'Smart Poultry Precision OS'}
+            </h1>
+
+            <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed max-w-xl">
+              {activeBatch
+                ? `Day ${activeBatch.daysElapsed || 1} of ${activeBatch.durationDays || 45} cycle. Livability tracking at ${(100 - (activeBatch.mortalityPercentage || 0)).toFixed(1)}% with Cobb 500 automated biometric weight projection.`
+                : 'Manage every flock, monitor real-time environmental biometrics, and forecast harvesting margins through one spatial glass ecosystem.'}
+            </p>
+
+            {/* VisionOS Tactile Pill Action Buttons */}
+            <div className="flex flex-wrap items-center gap-3 pt-2">
+              <Link
+                href="/dashboard/batches"
+                className="spatial-btn-primary"
+              >
+                <Play className="w-4 h-4 fill-black" />
+                <span>Inspect Active Flock</span>
+              </Link>
+
+              <button
+                onClick={() => setShowWhatsAppModal(true)}
+                className="spatial-btn-secondary"
+              >
+                <Send className="w-4 h-4 text-emerald-400" />
+                <span>WhatsApp Briefing</span>
+              </button>
+
+              <Link
+                href="/dashboard/billing"
+                className="spatial-btn-secondary"
+              >
+                <Receipt className="w-4 h-4 text-cyan-400" />
+                <span>3D Billing Calc</span>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </TiltCard>
+
+      {/* ── 4 Core Spatial Glass Metric Cards with Circular Action Badges ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {coreStats.map((c) => {
           const Icon = c.icon;
           return (
             <Link key={c.id} href={c.href}>
               <TiltCard maxTilt={4} glare={true}>
-                <div className="spatial-card p-5 sm:p-6 flex flex-col justify-between h-36 sm:h-40 group cursor-pointer">
+                <div className="spatial-card p-5 sm:p-6 flex flex-col justify-between h-38 sm:h-42 group cursor-pointer">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                       {c.title}
                     </span>
-                    <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-emerald-400 transition-transform group-hover:scale-110">
-                      <Icon className="w-4 h-4" />
+                    {/* VisionOS Circular Action Badge */}
+                    <div className="w-9 h-9 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/15 flex items-center justify-center text-white transition-transform group-hover:scale-110 shadow-sm">
+                      <Icon className="w-4 h-4 text-white" />
                     </div>
                   </div>
 
                   <div>
-                    <div className="text-2xl sm:text-3xl font-black text-[var(--text-primary)] tracking-tight">
+                    <div className="text-2xl sm:text-3xl font-black text-white tracking-tight">
                       {c.value}
                     </div>
-                    <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] mt-1 font-medium">
+                    <div className="flex items-center justify-between text-[11px] text-[var(--text-secondary)] mt-1.5 font-medium">
                       <span className="truncate">{c.sub}</span>
-                      <ArrowUpRight className="w-3.5 h-3.5 text-emerald-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+                      <ArrowUpRight className="w-3.5 h-3.5 text-sky-400 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                     </div>
                   </div>
                 </div>
@@ -327,9 +364,9 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── Floating Spatial Quick Actions Bar ── */}
-      <div className="spatial-glass p-3 sm:p-4">
-        <div className="flex items-center gap-2 mb-2 px-1 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
+      {/* ── Floating Spatial Quick Actions Dock ── */}
+      <div className="spatial-glass p-3.5 sm:p-4">
+        <div className="flex items-center gap-2 mb-2.5 px-1 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
           <span>Spatial Quick Operations</span>
         </div>
@@ -340,9 +377,9 @@ export default function DashboardPage() {
               <Link
                 key={i}
                 href={act.href}
-                className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 hover:border-emerald-500/40 text-[var(--text-primary)] hover:text-emerald-300 text-xs font-bold transition-all flex items-center gap-2 shadow-sm active:scale-95 cursor-pointer"
+                className="p-3 rounded-2xl bg-white/5 hover:bg-white/12 border border-white/10 hover:border-white/30 text-white text-xs font-bold transition-all flex items-center gap-2.5 shadow-sm active:scale-95 cursor-pointer"
               >
-                <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                <div className="w-7 h-7 rounded-xl bg-white/10 flex items-center justify-center text-sky-300 flex-shrink-0">
                   <Icon className="w-3.5 h-3.5" />
                 </div>
                 <span className="truncate">{act.label}</span>
@@ -356,12 +393,12 @@ export default function DashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <h2 className="text-base font-extrabold text-[var(--text-primary)] tracking-tight">
+            <div className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+            <h2 className="text-base font-extrabold text-white tracking-tight">
               🧠 AI Farm Intelligence Command Center
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-teal-300 bg-teal-950/60 px-2.5 py-0.5 rounded-full border border-teal-500/30">
+          <span className="text-[11px] font-mono text-sky-300 bg-sky-950/60 px-2.5 py-0.5 rounded-full border border-sky-500/30">
             Real-Time Biometric Analysis Active
           </span>
         </div>
@@ -402,10 +439,10 @@ export default function DashboardPage() {
                   <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase truncate">
                     {card.title}
                   </span>
-                  <Icon className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <Icon className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
                 </div>
                 <div>
-                  <div className="text-lg font-black text-[var(--text-primary)] tracking-tight">
+                  <div className="text-lg font-black text-white tracking-tight">
                     {card.value}
                   </div>
                   <div className="text-[10px] text-[var(--text-muted)] truncate">
@@ -425,7 +462,7 @@ export default function DashboardPage() {
           <div className="spatial-glass p-6 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+                <h3 className="text-sm font-extrabold text-white">
                   Revenue vs Operating Expenditure
                 </h3>
                 <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -447,15 +484,15 @@ export default function DashboardPage() {
                 <AreaChart data={monthlyData} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
                     <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10B981" stopOpacity={0.35} />
-                      <stop offset="95%" stopColor="#10B981" stopOpacity={0.0} />
+                      <stop offset="5%" stopColor="#38BDF8" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#38BDF8" stopOpacity={0.0} />
                     </linearGradient>
                     <linearGradient id="expGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.3} />
+                      <stop offset="5%" stopColor="#F43F5E" stopOpacity={0.35} />
                       <stop offset="95%" stopColor="#F43F5E" stopOpacity={0.0} />
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.06)" />
                   <XAxis dataKey="month" stroke="var(--text-muted)" fontSize={11} tickLine={false} />
                   <YAxis
                     stroke="var(--text-muted)"
@@ -465,18 +502,18 @@ export default function DashboardPage() {
                   />
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(10, 18, 14, 0.9)',
-                      borderColor: 'rgba(255, 255, 255, 0.1)',
-                      borderRadius: '1rem',
+                      backgroundColor: 'rgba(12, 16, 26, 0.92)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      borderRadius: '1.25rem',
                       fontSize: '12px',
-                      boxShadow: '0 20px 40px rgba(0,0,0,0.6)',
-                      backdropFilter: 'blur(20px)',
+                      boxShadow: '0 25px 50px rgba(0,0,0,0.8)',
+                      backdropFilter: 'blur(28px)',
                     }}
                   />
                   <Area
                     type="monotone"
                     dataKey="revenue"
-                    stroke="#10B981"
+                    stroke="#38BDF8"
                     strokeWidth={2.5}
                     fillOpacity={1}
                     fill="url(#revGrad)"
@@ -499,7 +536,7 @@ export default function DashboardPage() {
         <div className="lg:col-span-4">
           <div className="spatial-glass p-6 h-full flex flex-col justify-between">
             <div>
-              <h3 className="text-sm font-extrabold text-[var(--text-primary)]">
+              <h3 className="text-sm font-extrabold text-white">
                 Cost Category Distribution
               </h3>
               <p className="text-xs text-[var(--text-muted)] mt-0.5">
@@ -523,11 +560,11 @@ export default function DashboardPage() {
                   </Pie>
                   <Tooltip
                     contentStyle={{
-                      backgroundColor: 'rgba(10, 18, 14, 0.9)',
-                      borderColor: 'rgba(255, 255, 255, 0.1)',
-                      borderRadius: '1rem',
+                      backgroundColor: 'rgba(12, 16, 26, 0.92)',
+                      borderColor: 'rgba(255, 255, 255, 0.15)',
+                      borderRadius: '1.25rem',
                       fontSize: '12px',
-                      backdropFilter: 'blur(20px)',
+                      backdropFilter: 'blur(28px)',
                     }}
                     formatter={(v: any) => formatMoney(v)}
                   />
@@ -546,7 +583,7 @@ export default function DashboardPage() {
                 <div key={d.name} className="flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: d.color }} />
                   <span className="text-[var(--text-muted)] text-[11px] truncate">{d.name}:</span>
-                  <span className="font-bold text-[11px]">{formatMoney(d.value)}</span>
+                  <span className="font-bold text-[11px] text-white">{formatMoney(d.value)}</span>
                 </div>
               ))}
             </div>
