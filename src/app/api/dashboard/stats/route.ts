@@ -48,8 +48,8 @@ export async function GET() {
 
     // 4. Feed Consumed from Daily Batch Records
     const dailyFeedAgg = await prisma.dailyBatchRecord.aggregate({ _sum: { feedConsumed: true } });
-    const feedConsumed = dailyFeedAgg._sum.feedConsumed || (feedTotalQuantity > 0 ? feedTotalQuantity * 0.75 : 0);
-    const feedRemaining = Math.max(0, (feedTotalQuantity > 0 ? feedTotalQuantity : 5000) - feedConsumed);
+    const feedConsumed = dailyFeedAgg._sum.feedConsumed || 0;
+    const feedRemaining = Math.max(0, feedTotalQuantity - feedConsumed);
 
     // 5. Sales & Revenue
     const salesAgg = await prisma.sales.aggregate({

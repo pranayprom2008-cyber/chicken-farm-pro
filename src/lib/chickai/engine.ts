@@ -40,25 +40,25 @@ export class ChickAIEngine {
     const batches = this.context.batches || [];
     if (batches.length === 0) {
       return {
-        avgMortalityPct: 2.5,
-        avgFCR: 1.58,
-        avgFeedCostPerBird: 161.5,
-        avgCostPerBird: 98.8,
-        avgProfitPerBatch: 127500,
-        avgHarvestWeightKg: 2.35,
+        avgMortalityPct: 0,
+        avgFCR: 0,
+        avgFeedCostPerBird: 0,
+        avgCostPerBird: 0,
+        avgProfitPerBatch: 0,
+        avgHarvestWeightKg: 0,
         sampleBatchesCount: 0,
-        avgDailyFeedKg: 720,
+        avgDailyFeedKg: 0,
       };
     }
 
     const totalBatches = batches.length;
     const avgMortalityPct = Number(
-      (batches.reduce((sum, b) => sum + (b.mortalityPercentage || 2.4), 0) / totalBatches).toFixed(2)
+      (batches.reduce((sum, b) => sum + (b.mortalityPercentage || 0), 0) / totalBatches).toFixed(2)
     );
 
-    const totalAlive = batches.reduce((sum, b) => sum + (b.aliveChicks || 4880), 0);
-    const totalExp = this.context.stats?.totalExpenditure || 482500;
-    const avgCostPerBird = Number((totalExp / (totalAlive || 1)).toFixed(2));
+    const totalAlive = batches.reduce((sum, b) => sum + (b.aliveChicks || 0), 0);
+    const totalExp = this.context.stats?.totalExpenditure || 0;
+    const avgCostPerBird = totalAlive > 0 ? Number((totalExp / totalAlive).toFixed(2)) : 0;
     const avgDailyFeedKg = Math.round(totalAlive * 0.13);
 
     return {
@@ -66,7 +66,7 @@ export class ChickAIEngine {
       avgFCR: 1.58,
       avgFeedCostPerBird: 161.5,
       avgCostPerBird,
-      avgProfitPerBatch: Math.round((this.context.stats?.netRealizedProfit || 140000) / (totalBatches || 1)),
+      avgProfitPerBatch: totalBatches > 0 ? Math.round((this.context.stats?.netRealizedProfit || 0) / totalBatches) : 0,
       avgHarvestWeightKg: 2.35,
       sampleBatchesCount: totalBatches,
       avgDailyFeedKg,
@@ -94,7 +94,7 @@ export class ChickAIEngine {
     }
 
     const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-    const mortalityPct = stats.mortalityPercentage ?? (activeBatch ? activeBatch.mortalityPercentage : 2.4);
+    const mortalityPct = stats.mortalityPercentage ?? (activeBatch ? activeBatch.mortalityPercentage : 0);
 
     let mortalityControl = 94;
     if (mortalityPct <= 2.0) mortalityControl = 98;
@@ -107,7 +107,9 @@ export class ChickAIEngine {
     if (criticalBatches > 0) batchHealth -= criticalBatches * 15;
     batchHealth = Math.max(55, Math.min(99, batchHealth));
 
-    const feedRunwayDays = Number(((stats.feedRemaining || 1850) / ((stats.aliveChicks || 4880) * 0.13)).toFixed(1));
+    const totalAlive = stats.aliveChicks || 0;
+    const feedRemaining = stats.feedRemaining || 0;
+    const feedRunwayDays = totalAlive > 0 ? Number((feedRemaining / (totalAlive * 0.13)).toFixed(1)) : 10;
     let feedEfficiency = 88;
     if (feedRunwayDays >= 6.0) feedEfficiency = 95;
     else if (feedRunwayDays >= 4.0) feedEfficiency = 88;
@@ -171,10 +173,28 @@ export class ChickAIEngine {
     const stats = this.context.stats || {};
     const baselines = this.calculateHistoricalBaselines();
 
+    if (batches.length === 0) {
+      return [
+        {
+          id: 'alert-empty',
+          severity: 'healthy',
+          title: 'Database Ready for Flock Placement',
+          description: 'No active batches currently detected. Create your first batch to initiate live biometric tracking.',
+          metric: '0 Batches',
+          whatChanged: 'Fresh farm initialization',
+          differencePct: '0%',
+          comparedWith: 'Baseline',
+          whyItMatters: 'Biometric tracking begins upon batch creation.',
+          recommendation: 'Click "+ Create New Batch" in Batch Management to start your first flock.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ];
+    }
+
     batches.forEach((b) => {
       const mort = b.mortalityPercentage || 0;
       if (mort > 4.2) {
-        const diff = ((mort - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(1);
+        const diff = baselines.avgMortalityPct > 0 ? ((mort - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(1) : '0';
         alerts.push({
           id: `alert-mort-${b.id}`,
           severity: 'critical',
@@ -191,7 +211,7 @@ export class ChickAIEngine {
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         });
       } else if (mort > 3.0) {
-        const diff = ((mort - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(1);
+        const diff = baselines.avgMortalityPct > 0 ? ((mort - baselines.avgMortalityPct) / baselines.avgMortalityPct * 100).toFixed(1) : '0';
         alerts.push({
           id: `alert-warn-${b.id}`,
           severity: 'attention',
@@ -210,24 +230,27 @@ export class ChickAIEngine {
       }
     });
 
-    const alive = stats.aliveChicks || 4880;
-    const feedRemaining = stats.feedRemaining || 1850;
-    const feedRunwayDays = Number((feedRemaining / Math.max(1, alive * 0.13)).toFixed(1));
+    const alive = stats.aliveChicks || 0;
+    const feedRemaining = stats.feedRemaining || 0;
 
-    if (feedRunwayDays < 3.5) {
-      alerts.push({
-        id: 'alert-feed-critical',
-        severity: 'critical',
-        title: 'Feed Stockout Depletion Alert',
-        description: `Current feed inventory (${feedRemaining} kg) will last only ~${feedRunwayDays} days.`,
-        metric: `${feedRunwayDays} Days Runway`,
-        whatChanged: `Stock dropped to ${feedRemaining} kg`,
-        differencePct: `-45% below safety reserve`,
-        comparedWith: `Recommended 7-day safety buffer (3,500 kg)`,
-        whyItMatters: 'Flock starvation or sudden feed transition causes severe FCR collapse and weight loss.',
-        recommendation: 'Order approximately 2,000 kg (40 bags) of Broiler Finisher feed immediately.',
-        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      });
+    if (alive > 0) {
+      const feedRunwayDays = Number((feedRemaining / Math.max(1, alive * 0.13)).toFixed(1));
+
+      if (feedRunwayDays < 3.5) {
+        alerts.push({
+          id: 'alert-feed-critical',
+          severity: 'critical',
+          title: 'Feed Stockout Depletion Alert',
+          description: `Current feed inventory (${feedRemaining} kg) will last only ~${feedRunwayDays} days.`,
+          metric: `${feedRunwayDays} Days Runway`,
+          whatChanged: `Stock dropped to ${feedRemaining} kg`,
+          differencePct: `-45% below safety reserve`,
+          comparedWith: `Recommended 7-day safety buffer (3,500 kg)`,
+          whyItMatters: 'Flock starvation or sudden feed transition causes severe FCR collapse and weight loss.',
+          recommendation: 'Order approximately 2,000 kg (40 bags) of Broiler Finisher feed immediately.',
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        });
+      }
     }
 
     if (alerts.length === 0) {
@@ -235,7 +258,7 @@ export class ChickAIEngine {
         id: 'alert-healthy-all',
         severity: 'healthy',
         title: 'All Active Flocks in Optimal Condition',
-        description: `Bio-security protocols, livability (${(100 - (stats.mortalityPercentage || 2.4)).toFixed(1)}%), and feed curves match Cobb 500 standards.`,
+        description: `Bio-security protocols, livability (${(100 - (stats.mortalityPercentage || 0)).toFixed(1)}%), and feed curves match Cobb 500 standards.`,
         metric: '100% Operational',
         whatChanged: 'No anomalies detected',
         differencePct: '0%',
@@ -253,33 +276,52 @@ export class ChickAIEngine {
   // 4. PREDICTIVE BATCH & PROFIT FORECASTING
   // ==========================================
   public getBatchForecast(targetBatch?: any): BatchForecastResult {
-    const b = targetBatch || this.context.batches.find((batch) => batch.status === 'growing') || this.context.batches[0];
-    const started = b ? b.totalChicks || 5000 : 5000;
-    const alive = b ? b.aliveChicks || 4880 : 4880;
-    const age = b ? b.ageInDays || 28 : 28;
-    const targetAge = 42;
+    const batches = this.context.batches || [];
+    const b = targetBatch || batches.find((batch) => batch.status === 'growing') || batches[0];
+
+    if (!b) {
+      return {
+        batchNumber: 'No Active Batch',
+        expectedFinalBirds: 0,
+        expectedMortalityPct: 0,
+        expectedFinalWeightKg: 0,
+        remainingFeedKg: 0,
+        finalFeedCost: 0,
+        finalExpenses: 0,
+        expectedGrossRevenue: 0,
+        expectedNetProfit: 0,
+        profitMarginPct: 0,
+        expectedCompletionDate: 'N/A',
+        confidencePct: 100,
+      };
+    }
+
+    const started = b.totalChicks || 0;
+    const alive = b.aliveChicks || 0;
+    const age = b.daysElapsed || b.ageInDays || 1;
+    const targetAge = b.durationDays || 42;
     const daysRemaining = Math.max(0, targetAge - age);
 
-    const projectedMortalityPct = b?.mortalityPercentage ? Math.min(6, b.mortalityPercentage + daysRemaining * 0.05) : 3.2;
+    const projectedMortalityPct = b.mortalityPercentage ? Math.min(6, b.mortalityPercentage + daysRemaining * 0.05) : 3.2;
     const expectedFinalBirds = Math.round(started * (1 - projectedMortalityPct / 100));
     const expectedFinalWeightKg = 2.32;
     const totalHarvestBiomassKg = expectedFinalBirds * expectedFinalWeightKg;
 
     const remainingFeedKg = Math.round(expectedFinalBirds * (daysRemaining * 0.16));
-    const currentCost = b?.totalCost || 340000;
+    const currentCost = b.totalCost || b.totalExpenditure || 0;
     const additionalFeedCost = Math.round(remainingFeedKg * 42.5);
     const finalExpenses = currentCost + additionalFeedCost + Math.round(expectedFinalBirds * 8);
 
     const expectedRatePerKg = 118;
     const expectedGrossRevenue = Math.round(totalHarvestBiomassKg * expectedRatePerKg);
     const expectedNetProfit = expectedGrossRevenue - finalExpenses;
-    const profitMarginPct = Number(((expectedNetProfit / Math.max(1, expectedGrossRevenue)) * 100).toFixed(1));
+    const profitMarginPct = expectedGrossRevenue > 0 ? Number(((expectedNetProfit / expectedGrossRevenue) * 100).toFixed(1)) : 0;
 
     const harvestDate = new Date();
     harvestDate.setDate(harvestDate.getDate() + daysRemaining);
 
     return {
-      batchNumber: b?.batchNumber || 'Batch-01',
+      batchNumber: b.batchNumber,
       expectedFinalBirds,
       expectedMortalityPct: Number(projectedMortalityPct.toFixed(1)),
       expectedFinalWeightKg,
@@ -299,24 +341,24 @@ export class ChickAIEngine {
   // ==========================================
   public getInventoryForecast(): InventoryForecastResult {
     const stats = this.context.stats || {};
-    const alive = stats.aliveChicks || 4880;
-    const currentFeedStockKg = stats.feedRemaining || 4200;
+    const alive = stats.aliveChicks || 0;
+    const currentFeedStockKg = stats.feedRemaining || 0;
     const dailyConsumptionKg = Math.round(alive * 0.135);
-    const daysRemaining = Number((currentFeedStockKg / Math.max(1, dailyConsumptionKg)).toFixed(1));
+    const daysRemaining = dailyConsumptionKg > 0 ? Number((currentFeedStockKg / dailyConsumptionKg).toFixed(1)) : 0;
 
     const depletionDateObj = new Date();
     depletionDateObj.setDate(depletionDateObj.getDate() + Math.floor(daysRemaining));
 
     const activeBatch = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
-    const age = activeBatch?.ageInDays || 28;
+    const age = activeBatch?.daysElapsed || activeBatch?.ageInDays || 1;
     const batchDaysLeft = Math.max(1, 42 - age);
     const requiredBatchFeedKg = Math.round(alive * batchDaysLeft * 0.155);
     const deficitKg = Math.max(0, requiredBatchFeedKg - currentFeedStockKg);
     const recommendedPurchaseKg = deficitKg > 0 ? Math.ceil(deficitKg / 50) * 50 : 2000;
 
     let urgency: 'normal' | 'attention' | 'critical' = 'normal';
-    if (daysRemaining < 3.0) urgency = 'critical';
-    else if (daysRemaining < 6.0) urgency = 'attention';
+    if (alive > 0 && daysRemaining < 3.0) urgency = 'critical';
+    else if (alive > 0 && daysRemaining < 6.0) urgency = 'attention';
 
     return {
       currentFeedStockKg,
@@ -334,18 +376,18 @@ export class ChickAIEngine {
   // ==========================================
   public getSensorSnapshot(targetBatch?: any): SensorDataSnapshot {
     const b = targetBatch || this.context.batches[0];
-    const age = b?.ageInDays || 28;
+    const age = b?.daysElapsed || b?.ageInDays || 1;
     const targetTempRange: [number, number] = age < 7 ? [31, 33] : age < 21 ? [26, 28] : [22, 25];
 
     return {
-      shedId: `Shed 01 (${b?.batchNumber || 'Active Flock'})`,
+      shedId: `Shed 01 (${b?.batchNumber || 'General Shed'})`,
       temperatureC: 24.8,
       targetTempRange,
       humidityPct: 64,
       targetHumidityRange: [55, 70],
       ammoniaPpm: 12,
       co2Ppm: 1850,
-      waterConsumptionLitersDay: Math.round((b?.aliveChicks || 4880) * 0.28),
+      waterConsumptionLitersDay: Math.round((b?.aliveChicks || 0) * 0.28),
       lightIntensityLux: 25,
       ventilationStatus: 'Optimal',
       lastUpdated: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
@@ -357,12 +399,12 @@ export class ChickAIEngine {
   // ==========================================
   public analyzeImage(imageUrlOrBase64: string, targetBatch?: any): VisionAnalysisResult {
     const b = targetBatch || this.context.batches[0];
-    const age = b?.ageInDays || 28;
+    const age = b?.daysElapsed || b?.ageInDays || 1;
     const expectedWeight = age >= 35 ? 2.1 : age >= 28 ? 1.55 : 0.85;
 
     return {
       imageUrl: imageUrlOrBase64,
-      approximateBirdCount: 340,
+      approximateBirdCount: b?.aliveChicks ? Math.min(340, b.aliveChicks) : 0,
       flockDistribution: 'Uniform',
       activityLevel: 'Normal',
       deadOrInactiveVisible: 0,
@@ -387,7 +429,7 @@ export class ChickAIEngine {
   // ==========================================
   public estimateFlockWeight(targetBatch?: any, imageUrl?: string): WeightEstimationResult {
     const b = targetBatch || this.context.batches[0];
-    const age = b?.ageInDays || 28;
+    const age = b?.daysElapsed || b?.ageInDays || 1;
     const expectedTargetWeightKg = age >= 42 ? 2.35 : age >= 35 ? 1.95 : age >= 28 ? 1.55 : 0.82;
     const estimatedWeightKg = Number((expectedTargetWeightKg * 0.98).toFixed(2));
     const deviationPct = Number((((estimatedWeightKg - expectedTargetWeightKg) / expectedTargetWeightKg) * 100).toFixed(1));
@@ -412,6 +454,13 @@ export class ChickAIEngine {
   public getCrossFeatureSynthesis(): { priorityText: string; proposal?: ActionProposal } {
     const inventory = this.getInventoryForecast();
     const activeBatch = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
+
+    if (!activeBatch) {
+      return {
+        priorityText: `### 🌟 ChickAI Executive Cross-Feature Synthesis\n\n• **Status:** No active batches are currently growing in your database.\n• **Action Required:** Place your first flock to initiate automated feed forecasting and profit telemetry.`,
+      };
+    }
+
     const forecast = this.getBatchForecast(activeBatch);
     const alerts = this.getProactiveAlerts();
     const criticalAlerts = alerts.filter((a) => a.severity === 'critical');
@@ -422,7 +471,7 @@ export class ChickAIEngine {
       text += `🚨 **Critical Anomaly:** ${criticalAlerts[0].title} (${criticalAlerts[0].whatChanged}).\n`;
     }
 
-    text += `• **Inventory vs Flock Demand:** Current feed reserve (${inventory.currentFeedStockKg.toLocaleString()} kg) will deplete in **${inventory.daysRemaining} days**, while **${activeBatch?.batchNumber || 'active flock'}** requires **${forecast.remainingFeedKg.toLocaleString()} kg** over the next **${Math.max(1, 42 - (activeBatch?.ageInDays || 28))} days**.\n`;
+    text += `• **Inventory vs Flock Demand:** Current feed reserve (${inventory.currentFeedStockKg.toLocaleString()} kg) will deplete in **${inventory.daysRemaining} days**, while **${activeBatch.batchNumber}** requires **${forecast.remainingFeedKg.toLocaleString()} kg** over the next **${Math.max(1, (activeBatch.durationDays || 42) - (activeBatch.daysElapsed || activeBatch.ageInDays || 1))} days**.\n`;
     text += `• **Profit Margin Impact:** Projected final net profit stands at **₹ ${forecast.expectedNetProfit.toLocaleString('en-IN')}** (${forecast.profitMarginPct}% margin) based on ${forecast.expectedFinalBirds.toLocaleString()} harvestable birds.\n`;
     text += `\n> 💡 **Recommended Priority Action:** Procure **${inventory.recommendedPurchaseKg.toLocaleString()} kg** of feed to secure batch completion without growth stalling.`;
 
@@ -430,10 +479,10 @@ export class ChickAIEngine {
       type: 'create_feed_purchase',
       title: `Create Procurement Task: ${inventory.recommendedPurchaseKg} kg Feed`,
       details: {
-        taskTitle: `Procure ${inventory.recommendedPurchaseKg} kg Broiler Feed for ${activeBatch?.batchNumber || 'Farm'}`,
+        taskTitle: `Procure ${inventory.recommendedPurchaseKg} kg Broiler Feed for ${activeBatch.batchNumber}`,
         purchaseQuantityKg: inventory.recommendedPurchaseKg,
         priority: inventory.urgency === 'critical' ? 'high' : 'medium',
-        batchNumber: activeBatch?.batchNumber || 'General Farm',
+        batchNumber: activeBatch.batchNumber,
       },
       status: 'pending',
     };
@@ -450,14 +499,14 @@ export class ChickAIEngine {
   public runWhatIfSimulation(query: string): WhatIfSimulationResult {
     const q = query.toLowerCase();
     const activeBatch = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
-    const alive = activeBatch ? activeBatch.aliveChicks : 4880;
+    const alive = activeBatch ? activeBatch.aliveChicks : 0;
     const targetWeight = 2.35;
     const baseSellingRate = 118;
     const baseFeedCostPerKg = 42.5;
     const totalFeedKg = alive * 3.8;
 
     const baseGrossRev = Math.round(alive * targetWeight * baseSellingRate);
-    const baseChickCost = (activeBatch?.totalChicks || 5000) * (activeBatch?.costPerChick || 38);
+    const baseChickCost = activeBatch ? (activeBatch.totalChicks || 0) * (activeBatch.costPerChick || 38) : 0;
     const baseFeedCost = Math.round(totalFeedKg * baseFeedCostPerKg);
     const baseOtherCost = Math.round(alive * 12);
     const originalProfit = baseGrossRev - (baseChickCost + baseFeedCost + baseOtherCost);
@@ -485,8 +534,8 @@ export class ChickAIEngine {
     } else if (q.includes('mortality') || q.includes('death')) {
       const match = query.match(/(\d+(?:\.\d+)?)\s*%/);
       const targetMortalityPct = match ? parseFloat(match[1]) : 5.0;
-      const simulatedDead = Math.round((activeBatch?.totalChicks || 5000) * (targetMortalityPct / 100));
-      const simulatedAlive = (activeBatch?.totalChicks || 5000) - simulatedDead;
+      const simulatedDead = Math.round((activeBatch?.totalChicks || 0) * (targetMortalityPct / 100));
+      const simulatedAlive = Math.max(0, (activeBatch?.totalChicks || 0) - simulatedDead);
       const newGrossRev = Math.round(simulatedAlive * targetWeight * baseSellingRate);
       newProfit = newGrossRev - (baseChickCost + baseFeedCost + baseOtherCost);
       impactAmount = Math.abs(originalProfit - newProfit);
@@ -558,7 +607,7 @@ export class ChickAIEngine {
       };
     }
 
-    // 2. Check for Image / Vision Analysis ("Analyze this image", "Check shed photo")
+    // 2. Check for Image / Vision Analysis
     if (queryLower.includes('image') || queryLower.includes('photo') || queryLower.includes('picture') || queryLower.includes('vision') || queryLower.includes('camera') || queryLower.includes('shed photo')) {
       const vision = this.analyzeImage('', targetBatch);
       const text = `### 📷 ChickAI Vision Analysis\n\n• **Surveilled Birds:** ~${vision.approximateBirdCount} visible birds\n• **Flock Distribution:** **${vision.flockDistribution}**\n• **Activity Status:** **${vision.activityLevel}**\n• **Estimated Avg Weight:** **${vision.estimatedAvgWeightKg} kg** (Confidence: ${vision.confidenceScore}%)\n\n#### 🔍 Visual Observations:\n${vision.observations.map((o) => `• ${o}`).join('\n')}\n\n${vision.disclaimer}`;
@@ -572,7 +621,7 @@ export class ChickAIEngine {
       };
     }
 
-    // 3. Check for Sensor Data ("Show sensor data", "What is the temperature?", "Check ammonia")
+    // 3. Check for Sensor Data
     if (queryLower.includes('sensor') || queryLower.includes('temperature') || queryLower.includes('humidity') || queryLower.includes('ammonia') || queryLower.includes('co2') || queryLower.includes('environment')) {
       const sensor = this.getSensorSnapshot(targetBatch);
       const text = `### 🌡️ Real-Time Shed Telemetry (${sensor.shedId})\n\n• **Temperature:** **${sensor.temperatureC}°C** (Target: ${sensor.targetTempRange[0]} - ${sensor.targetTempRange[1]}°C) 🟢\n• **Relative Humidity:** **${sensor.humidityPct}%** (Target: ${sensor.targetHumidityRange[0]} - ${sensor.targetHumidityRange[1]}%) 🟢\n• **Ammonia Level:** **${sensor.ammoniaPpm} ppm** (Safe Threshold: < 20 ppm) 🟢\n• **CO₂ Concentration:** **${sensor.co2Ppm} ppm**\n• **Drinking Water Flow:** **${sensor.waterConsumptionLitersDay} L/day**\n• **Light Level:** **${sensor.lightIntensityLux} Lux**\n• **Ventilation Mode:** **${sensor.ventilationStatus}**`;
@@ -586,7 +635,7 @@ export class ChickAIEngine {
       };
     }
 
-    // 4. Check for Cross-Feature Synthesis ("What should I worry about today?", "Executive summary", "Synthesize")
+    // 4. Check for Cross-Feature Synthesis
     if (queryLower.includes('worry') || queryLower.includes('priority') || queryLower.includes('executive synthesis') || queryLower.includes('attention today')) {
       const synthesis = this.getCrossFeatureSynthesis();
       return {
@@ -598,7 +647,7 @@ export class ChickAIEngine {
       };
     }
 
-    // 5. Check for Batch / Profit Forecast ("Predict profit", "forecast batch 45", "final profit")
+    // 5. Check for Batch / Profit Forecast
     if (queryLower.includes('predict') || queryLower.includes('forecast') || queryLower.includes('future profit') || queryLower.includes('expected revenue')) {
       const forecast = this.getBatchForecast(targetBatch);
       const text = `### 🔮 Batch & Profit Forecast (${forecast.batchNumber})
@@ -623,7 +672,7 @@ export class ChickAIEngine {
       };
     }
 
-    // 6. Check for Inventory Forecast ("How much feed is left?", "Inventory forecast", "When will feed run out?")
+    // 6. Check for Inventory Forecast
     if (queryLower.includes('inventory') || queryLower.includes('feed stock') || queryLower.includes('run out') || queryLower.includes('how much feed')) {
       const inv = this.getInventoryForecast();
       const text = `### 🌽 AI Feed Inventory Forecast\n\n• **Current Feed Stock:** **${inv.currentFeedStockKg.toLocaleString()} kg** (~${Math.round(inv.currentFeedStockKg / 50)} bags)\n• **Daily Flock Appetite:** **${inv.dailyConsumptionKg} kg/day**\n• **Estimated Stock Runway:** **${inv.daysRemaining} days** (Depletion: **${inv.depletionDate}**)\n• **Total Grow-Out Requirement:** **${inv.requiredBatchFeedKg.toLocaleString()} kg**\n\n> 📋 **Recommendation:** Procure **${inv.recommendedPurchaseKg.toLocaleString()} kg** (${Math.round(inv.recommendedPurchaseKg / 50)} bags) to prevent feeding disruptions.`;
@@ -698,16 +747,16 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
     // 10. Check for FCR Command
     if (queryLower.includes('fcr') || queryLower.includes('feed conversion') || queryLower.includes('feed efficiency')) {
       const active = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
-      const alive = active?.aliveChicks || this.context.stats?.aliveChicks || 4880;
+      const alive = active?.aliveChicks || this.context.stats?.aliveChicks || 0;
       const avgWeight = 2.15;
       const totalWeightGain = alive * avgWeight;
-      const totalFeedKg = active ? Math.round(active.aliveChicks * 3.35) : 16500;
-      const fcr = (totalFeedKg / Math.max(1, totalWeightGain)).toFixed(2);
+      const totalFeedKg = active ? Math.round(active.aliveChicks * 3.35) : 0;
+      const fcr = totalWeightGain > 0 ? (totalFeedKg / totalWeightGain).toFixed(2) : '0.00';
 
       return {
         id: `msg-${Date.now()}`,
         sender: 'assistant',
-        text: `### 🌾 Feed Conversion Ratio (FCR) Analysis\n\n• **Target Flock:** ${active?.batchNumber || 'Batch-01'} (${active?.breedType || 'Broiler Cobb 500'})\n• **Live Biomass:** ${(totalWeightGain / 1000).toFixed(1)} Tonnes (~${alive.toLocaleString()} birds @ ${avgWeight} kg)\n• **Cumulative Feed Consumed:** ${totalFeedKg.toLocaleString()} kg (~${Math.round(totalFeedKg / 50)} bags)\n• **Calculated FCR:** **${fcr}** 🟢 *(Standard Commercial Benchmark: 1.55 - 1.65)*\n\n> 💡 **Efficiency Rating:** **Excellent**. Your feed-to-meat conversion is within top-tier commercial broiler performance standards.`,
+        text: `### 🌾 Feed Conversion Ratio (FCR) Analysis\n\n• **Target Flock:** ${active?.batchNumber || 'None'} (${active?.breedType || 'Broiler Cobb 500'})\n• **Live Biomass:** ${(totalWeightGain / 1000).toFixed(1)} Tonnes (~${alive.toLocaleString()} birds @ ${avgWeight} kg)\n• **Cumulative Feed Consumed:** ${totalFeedKg.toLocaleString()} kg (~${Math.round(totalFeedKg / 50)} bags)\n• **Calculated FCR:** **${fcr}** 🟢 *(Standard Commercial Benchmark: 1.55 - 1.65)*\n\n> 💡 **Efficiency Rating:** ${alive > 0 ? '**Optimal**' : '**Awaiting active flock**'}.`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
     }
@@ -715,17 +764,17 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
     // 11. Check for Break-Even Price Command
     if (queryLower.includes('break even') || queryLower.includes('breakeven') || queryLower.includes('cost per kg')) {
       const active = targetBatch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
-      const alive = active?.aliveChicks || this.context.stats?.aliveChicks || 4880;
-      const totalCost = active?.totalCost || this.context.stats?.totalExpenditure || 345000;
+      const alive = active?.aliveChicks || this.context.stats?.aliveChicks || 0;
+      const totalCost = active?.totalCost || active?.totalExpenditure || this.context.stats?.totalExpenditure || 0;
       const expectedHarvestKg = alive * 2.25;
-      const breakEvenPerKg = (totalCost / Math.max(1, expectedHarvestKg)).toFixed(2);
+      const breakEvenPerKg = expectedHarvestKg > 0 ? (totalCost / expectedHarvestKg).toFixed(2) : '0.00';
       const currentWholesaleRate = 118;
       const marginPerKg = (currentWholesaleRate - parseFloat(breakEvenPerKg)).toFixed(2);
 
       return {
         id: `msg-${Date.now()}`,
         sender: 'assistant',
-        text: `### 🎯 Break-Even Price Calculation\n\n• **Batch:** ${active?.batchNumber || 'Batch-01'}\n• **Total Incurred Cost:** ₹ ${totalCost.toLocaleString('en-IN')}\n• **Estimated Harvest Biomass:** ${Math.round(expectedHarvestKg).toLocaleString()} kg\n• **Break-Even Price:** **₹ ${breakEvenPerKg} / kg**\n\n#### 📈 Market Spread:\n• **Current Wholesale Rate:** ₹ ${currentWholesaleRate} / kg\n• **Estimated Net Margin:** **+₹ ${marginPerKg} / kg** (Total Profit: ~₹ ${Math.round(parseFloat(marginPerKg) * expectedHarvestKg).toLocaleString('en-IN')})`,
+        text: `### 🎯 Break-Even Price Calculation\n\n• **Batch:** ${active?.batchNumber || 'General Farm'}\n• **Total Incurred Cost:** ₹ ${totalCost.toLocaleString('en-IN')}\n• **Estimated Harvest Biomass:** ${Math.round(expectedHarvestKg).toLocaleString()} kg\n• **Break-Even Price:** **₹ ${breakEvenPerKg} / kg**\n\n#### 📈 Market Spread:\n• **Current Wholesale Rate:** ₹ ${currentWholesaleRate} / kg\n• **Estimated Net Margin:** **+₹ ${marginPerKg} / kg**`,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
     }
@@ -783,11 +832,9 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
       const count = countMatch ? parseInt(countMatch[1], 10) : null;
 
       if (count && count > 0 && batch) {
-        const currentAlive = batch.aliveChicks || 4880;
-        const currentDead = batch.deadChicks || 120;
-        const total = batch.totalChicks || 5000;
+        const currentAlive = batch.aliveChicks || 0;
+        const currentDead = batch.deadChicks || 0;
         const newAlive = Math.max(0, currentAlive - count);
-        const newDead = currentDead + count;
 
         return {
           text: `🐔 **Mortality Update Proposal**\n\n• **Batch:** ${batch.batchNumber}\n• **Deaths to Log:** **${count} birds**\n• **Alive Count:** ${currentAlive.toLocaleString()} $\\rightarrow$ **${newAlive.toLocaleString()}**\n\nAre you sure you want to record this mortality?`,
@@ -972,23 +1019,36 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
 | **Status** | ${b1.status.toUpperCase()} | ${b2.status.toUpperCase()} | — |
 | **Alive Birds** | ${b1.aliveChicks.toLocaleString()} | ${b2.aliveChicks.toLocaleString()} | ${b1.aliveChicks >= b2.aliveChicks ? '🟢 +' : '🔴 -'}${Math.abs(b1.aliveChicks - b2.aliveChicks)} |
 | **Mortality** | ${b1.mortalityPercentage}% | ${b2.mortalityPercentage}% | ${(b1.mortalityPercentage - b2.mortalityPercentage).toFixed(2)}% |
-| **Total Expenses** | ₹ ${(b1.totalCost || 0).toLocaleString('en-IN')} | ₹ ${(b2.totalCost || 0).toLocaleString('en-IN')} | ₹ ${Math.abs((b1.totalCost || 0) - (b2.totalCost || 0)).toLocaleString('en-IN')} |
+| **Total Expenses** | ₹ ${(b1.totalCost || b1.totalExpenditure || 0).toLocaleString('en-IN')} | ₹ ${(b2.totalCost || b2.totalExpenditure || 0).toLocaleString('en-IN')} | ₹ ${Math.abs((b1.totalCost || b1.totalExpenditure || 0) - (b2.totalCost || b2.totalExpenditure || 0)).toLocaleString('en-IN')} |
 
 > 💡 **AI Insight:** **${b1.mortalityPercentage < b2.mortalityPercentage ? b1.batchNumber : b2.batchNumber}** demonstrated superior mortality control and lower feed cost per live bird.`;
   }
 
   private getGeneralOverviewResponse(): string {
     const stats = this.context.stats || {};
+    const batches = this.context.batches || [];
     const score = this.calculateFarmAIScore();
-    const active = this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
+    const active = batches.find((b) => b.status === 'growing');
+
+    if (batches.length === 0) {
+      return `### 🐔 ChickAI Farm Operations Summary
+*Farm AI Score: **100 / 100** (Fresh Database Active)*
+
+• **Total Live Flock:** **0 birds** (No active batches)
+• **Overall Mortality:** **0%**
+• **Feed Reserve:** **${(stats.feedRemaining || 0).toLocaleString()} kg**
+• **Active Batches:** None placed yet
+
+*You can say: "Add ₹1,000 for feed" or create your first batch in Batch Management.*`;
+    }
 
     return `### 🐔 ChickAI Farm Operations Summary
 *Farm AI Score: **${score.overall} / 100** (Grade: **${score.grade}**)*
 
 • **Total Live Flock:** **${(stats.aliveChicks || 0).toLocaleString()} birds** across active sheds.
-• **Overall Mortality:** **${stats.mortalityPercentage || 2.4}%** *(Historical target: 2.5%)*
-• **Feed Reserve Runway:** **~${stats.feedRemaining || 1850} kg** (Runway: ~${((stats.feedRemaining || 1850) / Math.max(1, (stats.aliveChicks || 4880) * 0.13)).toFixed(1)} days)
-• **Active Flock:** **${active?.batchNumber || 'Batch-01'}** (Day ${active?.ageInDays || 28})
+• **Overall Mortality:** **${stats.mortalityPercentage || 0}%**
+• **Feed Reserve Runway:** **${stats.feedRemaining || 0} kg** (Runway: ~${stats.aliveChicks > 0 ? ((stats.feedRemaining || 0) / (stats.aliveChicks * 0.13)).toFixed(1) : '0'} days)
+• **Active Flock:** **${active?.batchNumber || 'Batch-01'}** (Day ${active?.daysElapsed || active?.ageInDays || 1})
 
 *Ask me anything or say: "What needs my attention today?", "Predict profit for active batch", or "Add ₹1,000 for feed".*`;
   }

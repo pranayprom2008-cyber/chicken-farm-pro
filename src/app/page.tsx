@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import {
@@ -8,7 +8,8 @@ import {
   Calculator,
   ShieldCheck,
   Activity,
-  Sparkles
+  Sparkles,
+  Plus
 } from 'lucide-react';
 import LiquidBackground from '@/components/LiquidBackground';
 import Floating3DChicken from '@/components/Floating3DChicken';
@@ -17,8 +18,45 @@ import ThemeToggle from '@/components/ThemeToggle';
 import { useFarmStore } from '@/store/useFarmStore';
 
 export default function HomePage() {
-  const { theme, isAuthenticated } = useFarmStore();
+  const { theme, isAuthenticated, stats, batches, syncAll } = useFarmStore();
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
+
+  useEffect(() => {
+    syncAll();
+  }, [syncAll]);
+
+  // Derive live telemetry from real store data
+  const totalChicks = stats?.totalChicks ?? 0;
+  const aliveChicks = stats?.aliveChicks ?? 0;
+  const mortalityPct = stats?.mortalityPercentage ?? 0;
+
+  // Active batch identification and dynamic age calculation
+  const activeBatches = batches.filter((b) => b.status === 'growing');
+  const primaryActiveBatch = activeBatches[0];
+
+  let batchTrackingText = 'No Active Batches';
+  let batchCycleSubtext = 'Ready for flock placement';
+
+  if (primaryActiveBatch) {
+    let daysElapsed = primaryActiveBatch.daysElapsed;
+    if (!daysElapsed && primaryActiveBatch.startDate) {
+      const start = new Date(primaryActiveBatch.startDate);
+      const now = new Date();
+      const diffTime = Math.abs(now.getTime() - start.getTime());
+      daysElapsed = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    }
+    const duration = primaryActiveBatch.durationDays || 45;
+    const currentDay = Math.min(duration, Math.max(1, daysElapsed || 1));
+    const daysLeft = Math.max(0, duration - currentDay);
+
+    batchTrackingText = `${primaryActiveBatch.batchNumber} • Day ${currentDay}`;
+    batchCycleSubtext = `${daysLeft} Days to Harvest (${duration}-Day Cycle)`;
+  } else if (batches.length > 0) {
+    batchTrackingText = `${batches.length} Closed Batches`;
+    batchCycleSubtext = 'All batches completed/sold';
+  }
+
+  const livabilityPct = totalChicks > 0 ? ((aliveChicks / totalChicks) * 100).toFixed(1) : '100.0';
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden flex flex-col justify-between transition-colors duration-500">
@@ -117,7 +155,7 @@ export default function HomePage() {
           </Link>
         </motion.div>
 
-        {/* Floating 3D Glass Dashboard Preview */}
+        {/* Dynamic Real Telemetry Dashboard Preview */}
         <motion.div
           initial={{ opacity: 0, y: 40 }}
           animate={{ opacity: 1, y: 0 }}
@@ -140,7 +178,7 @@ export default function HomePage() {
                       Commercial Flock Telemetry • 3D Biometric OS
                     </h3>
                     <p className="text-xs text-[var(--text-muted)]">
-                      Active Batch Live Telemetry & Biometric Tracking
+                      {activeBatches.length > 0 ? 'Live Telemetry & Biometric Tracking' : 'Database Synced • Ready for Flock Placement'}
                     </p>
                   </div>
                 </div>
@@ -150,34 +188,44 @@ export default function HomePage() {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
                   </span>
-                  <span className="text-xs font-bold text-emerald-500">Live Dual Sync</span>
+                  <span className="text-xs font-bold text-emerald-500">Live Universal Sync</span>
                 </div>
               </div>
 
-              {/* Metric Highlights */}
+              {/* Dynamic Real Metric Highlights */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
                 <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)]">
                   <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Total Chicks</span>
-                  <div className="text-2xl font-black text-[var(--text-primary)] mt-1">5,000</div>
-                  <span className="text-[10px] text-emerald-500 font-semibold">100% Initial Flock</span>
+                  <div className="text-2xl font-black text-[var(--text-primary)] mt-1">{totalChicks.toLocaleString()}</div>
+                  <span className="text-[10px] text-emerald-500 font-semibold">
+                    {totalChicks > 0 ? `${activeBatches.length} Active Flock${activeBatches.length === 1 ? '' : 's'}` : '0 Initial Stock'}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)]">
                   <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Alive Chicks</span>
-                  <div className="text-2xl font-black text-emerald-500 mt-1">4,880</div>
-                  <span className="text-[10px] text-emerald-500/80 font-semibold">97.6% Livability</span>
+                  <div className="text-2xl font-black text-emerald-500 mt-1">{aliveChicks.toLocaleString()}</div>
+                  <span className="text-[10px] text-emerald-500/80 font-semibold">
+                    {totalChicks > 0 ? `${livabilityPct}% Livability` : '100% Livability Target'}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)]">
                   <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Mortality Rate</span>
-                  <div className="text-2xl font-black text-emerald-500 mt-1">2.4%</div>
-                  <span className="text-[10px] text-emerald-500 font-semibold">Standard Safe</span>
+                  <div className="text-2xl font-black text-emerald-500 mt-1">{mortalityPct}%</div>
+                  <span className="text-[10px] text-emerald-500 font-semibold">
+                    {mortalityPct <= 2.5 ? 'Standard Safe' : 'Monitoring Required'}
+                  </span>
                 </div>
 
                 <div className="p-4 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)]">
                   <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase">Batch Tracking</span>
-                  <div className="text-2xl font-black text-emerald-600 dark:text-cyan-300 mt-1">Batch 45 • Day 28</div>
-                  <span className="text-[10px] text-teal-500 font-semibold">45-Day Cycle</span>
+                  <div className="text-xl font-black text-emerald-600 dark:text-cyan-300 mt-1 truncate">
+                    {batchTrackingText}
+                  </div>
+                  <span className="text-[10px] text-teal-500 font-semibold block truncate">
+                    {batchCycleSubtext}
+                  </span>
                 </div>
               </div>
 
@@ -187,7 +235,7 @@ export default function HomePage() {
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
                   <span>Authorized Administrators: <strong>John (Owner)</strong> & <strong>Pranay (Manager & Tech)</strong></span>
                 </div>
-                <span className="text-[11px] font-semibold text-emerald-500">Universal Persistent Storage Active</span>
+                <span className="text-[11px] font-semibold text-emerald-500">Real Database Telemetry Active</span>
               </div>
             </div>
           </TiltCard>
