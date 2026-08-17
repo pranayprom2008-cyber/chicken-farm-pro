@@ -296,7 +296,7 @@ export default function ChickAI() {
 
   // Test Voice Persona
   const handleTestVoicePersona = () => {
-    const previewText = "Good day. Farm intelligence telemetry is synced. All active flocks are performing within Cobb 500 parameters. How may I assist your operations?";
+    const previewText = "Here's your farm summary. All active batches are healthy and on schedule. How can I help?";
     voiceServiceRef.current.speak(previewText, voiceSettings);
   };
 
@@ -305,7 +305,7 @@ export default function ChickAI() {
     const nextMode = !activeVoiceMode;
     setActiveVoiceMode(nextMode);
     if (nextMode) {
-      const greeting = "Farm intelligence copilot online. Ready for your voice command.";
+      const greeting = "Farm copilot ready. What would you like to check or record?";
       voiceServiceRef.current.speak(greeting, voiceSettings, () => setConversationState('SPEAKING'), () => {
         if (voiceSettings.voiceCommands) startListening();
         else setConversationState('IDLE');
