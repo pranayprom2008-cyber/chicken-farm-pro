@@ -5,6 +5,7 @@ import { Menu, Search, Bell, Sparkles, Activity } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useFarmStore } from '@/store/useFarmStore';
 import Link from 'next/link';
+import ThemeToggle from './ThemeToggle';
 
 const pageTitles: Record<string, string> = {
   '/dashboard': 'Dashboard Overview',
@@ -79,10 +80,15 @@ export default function Header() {
           )}
         </Link>
 
+        {/* Quick Header Theme Switcher */}
+        <div className="hidden sm:block">
+          <ThemeToggle />
+        </div>
+
         {/* User Profile Avatar */}
         <Link
           href="/dashboard/settings"
-          className="w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 border border-emerald-400/30 cursor-pointer"
+          className="w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 border border-emerald-400/30 cursor-pointer flex-shrink-0"
           title="User Profile & Settings"
         >
           {initials}

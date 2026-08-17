@@ -45,7 +45,7 @@ export default function Sidebar() {
 
   const cycleTheme = () => {
     if (theme === 'light') setTheme('dark');
-    else if (theme === 'dark') setTheme('liquid');
+    else if (theme === 'dark') setTheme('vibe');
     else setTheme('light');
   };
 
