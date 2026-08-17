@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { motion, useSpring, useTransform } from 'framer-motion';
 
 interface TiltCardProps {
@@ -13,23 +13,30 @@ interface TiltCardProps {
 export default function TiltCard({
   children,
   className = '',
-  maxTilt = 12,
+  maxTilt = 4.5,
   glare = true,
 }: TiltCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
+  const [isTouch, setIsTouch] = useState(false);
 
-  const x = useSpring(0, { stiffness: 140, damping: 20, mass: 1.1 });
-  const y = useSpring(0, { stiffness: 140, damping: 20, mass: 1.1 });
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsTouch(window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window);
+    }
+  }, []);
+
+  const x = useSpring(0, { stiffness: 220, damping: 28, mass: 0.8 });
+  const y = useSpring(0, { stiffness: 220, damping: 28, mass: 0.8 });
 
   const rotateX = useTransform(y, [-0.5, 0.5], [maxTilt, -maxTilt]);
   const rotateY = useTransform(x, [-0.5, 0.5], [-maxTilt, maxTilt]);
 
-  const glareX = useTransform(x, [-0.5, 0.5], [0, 100]);
-  const glareY = useTransform(y, [-0.5, 0.5], [0, 100]);
+  const glareX = useTransform(x, [-0.5, 0.5], [10, 90]);
+  const glareY = useTransform(y, [-0.5, 0.5], [10, 90]);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!cardRef.current) return;
+    if (isTouch || !cardRef.current) return;
     const rect = cardRef.current.getBoundingClientRect();
     const width = rect.width;
     const height = rect.height;
@@ -52,38 +59,41 @@ export default function TiltCard({
 
   return (
     <div
-      style={{ perspective: 1000 }}
+      style={{ perspective: 1200 }}
       className="relative"
-      onMouseEnter={() => setIsHovered(true)}
+      onMouseEnter={() => !isTouch && setIsHovered(true)}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
     >
       <motion.div
         ref={cardRef}
-        style={{
-          rotateX,
-          rotateY,
-          transformStyle: 'preserve-3d',
-        }}
-        whileHover={{ scale: 1.015 }}
-        whileTap={{ scale: 0.985 }}
-        transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+        style={
+          isTouch
+            ? {}
+            : {
+                rotateX,
+                rotateY,
+                transformStyle: 'preserve-3d',
+              }
+        }
+        whileHover={isTouch ? {} : { y: -3 }}
+        transition={{ type: 'spring', stiffness: 350, damping: 26 }}
         className={`relative ${className}`}
       >
         {/* Child Content */}
-        <div style={{ transform: 'translateZ(20px)' }} className="relative z-10">
+        <div style={isTouch ? {} : { transform: 'translateZ(12px)' }} className="relative z-10">
           {children}
         </div>
 
-        {/* 3D Specular Glare Reflection */}
-        {glare && isHovered && (
+        {/* 3D Specular Dynamic Glass Refraction Glare */}
+        {glare && isHovered && !isTouch && (
           <motion.div
-            className="absolute inset-0 rounded-3xl pointer-events-none z-20 overflow-hidden"
+            className="absolute inset-0 rounded-[inherit] pointer-events-none z-20 overflow-hidden"
             initial={{ opacity: 0 }}
-            animate={{ opacity: 0.4 }}
+            animate={{ opacity: 0.35 }}
             exit={{ opacity: 0 }}
             style={{
-              background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.25) 0%, transparent 60%)`,
+              background: `radial-gradient(circle at ${glareX}% ${glareY}%, rgba(255, 255, 255, 0.28) 0%, transparent 65%)`,
             }}
           />
         )}

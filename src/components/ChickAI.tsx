@@ -782,15 +782,15 @@ export default function ChickAI() {
         </motion.button>
       </div>
 
-      {/* Main Glassmorphism AI Assistant Modal Panel */}
+      {/* Main Spatial Glass AI Command Center Panel */}
       <AnimatePresence>
         {isOpen && (
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.94, y: 24 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 rounded-3xl border border-emerald-500/30 bg-[#09130E]/90 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${
+            exit={{ opacity: 0, scale: 0.94, y: 24 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 rounded-[2rem] spatial-glass-elevated overflow-hidden flex flex-col transition-all duration-300 ${
               isExpanded
                 ? 'w-[95vw] sm:w-[760px] h-[92vh] max-h-[880px]'
                 : 'w-[95vw] sm:w-[480px] h-[85vh] max-h-[700px]'
@@ -800,23 +800,29 @@ export default function ChickAI() {
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
 
-            {/* Header */}
-            <div className="p-4 sm:p-5 border-b border-emerald-500/20 bg-black/40 flex items-center justify-between flex-shrink-0">
+            {/* Spatial Glass Header */}
+            <div className="p-4 sm:p-5 border-b border-white/10 bg-black/40 flex items-center justify-between flex-shrink-0">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 flex items-center justify-center text-white shadow-lg shadow-emerald-500/25 border border-emerald-400/30">
                   <Bot className="w-5 h-5" />
                 </div>
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <h3 className="font-extrabold text-sm text-white flex items-center gap-1">
-                      ChickAI
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
-                        Farm OS
+                    <h3 className="font-extrabold text-sm text-white flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      <span>✨ CHICKAI</span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
+                        FARM OS
                       </span>
                     </h3>
                   </div>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold ${statusIndicator.color}`}>
+                    <span className="flex items-center gap-1 text-[10px] text-emerald-400 font-mono font-bold">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>ONLINE</span>
+                    </span>
+                    <span className="text-[10px] text-slate-500">•</span>
+                    <span className="text-[10px] text-slate-400 font-mono">
                       {statusIndicator.text}
                     </span>
                   </div>

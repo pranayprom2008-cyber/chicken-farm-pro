@@ -8,101 +8,72 @@ export default function LiquidBackground() {
   const [mousePos, setMousePos] = useState({ x: -1000, y: -1000 });
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
-  const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
-  const isDark = theme === 'dark';
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const touch = window.matchMedia('(pointer: coarse)').matches || 'ontouchstart' in window;
       setIsTouchDevice(touch);
 
       if (!touch) {
+        let rafId: number;
         const handleMouseMove = (e: MouseEvent) => {
-          setMousePos({ x: e.clientX, y: e.clientY });
+          cancelAnimationFrame(rafId);
+          rafId = requestAnimationFrame(() => {
+            setMousePos({ x: e.clientX, y: e.clientY });
+          });
         };
         window.addEventListener('mousemove', handleMouseMove, { passive: true });
-        return () => window.removeEventListener('mousemove', handleMouseMove);
+        return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          cancelAnimationFrame(rafId);
+        };
       }
     }
   }, []);
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
-      {/* ── Theme: Liquid Glass Ambient Aura & 3D Interactive Spotlight ── */}
-      {isLiquid && (
-        <>
-          <div
-            className="absolute -top-[15%] -left-[10%] w-[380px] sm:w-[680px] h-[380px] sm:h-[680px] rounded-full opacity-25 animate-blob-1 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #8B5CF6 0%, #06B6D4 50%, transparent 70%)',
-              filter: 'blur(75px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-          <div
-            className="absolute -bottom-[20%] -right-[10%] w-[400px] sm:w-[720px] h-[400px] sm:h-[720px] rounded-full opacity-22 animate-blob-2 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #00E5FF 0%, #10B981 50%, transparent 70%)',
-              filter: 'blur(80px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
+      {/* ── Level 1: Spatial Technical Grid Canvas ── */}
+      <div className="absolute inset-0 spatial-grid-canvas opacity-35" />
 
-          {!isTouchDevice && (
-            <div
-              className="absolute w-[420px] h-[420px] rounded-full opacity-15 transition-transform duration-100 ease-out will-change-transform"
-              style={{
-                transform: `translate3d(${mousePos.x - 210}px, ${mousePos.y - 210}px, 0)`,
-                background: 'radial-gradient(circle, rgba(0, 229, 255, 0.4) 0%, rgba(139, 92, 246, 0.15) 45%, transparent 70%)',
-                filter: 'blur(55px)',
-              }}
-            />
-          )}
-        </>
-      )}
+      {/* ── Top-Left Ambient Emerald/Forest Glow Orb ── */}
+      <div
+        className="absolute -top-[12%] -left-[10%] w-[380px] sm:w-[650px] h-[380px] sm:h-[650px] rounded-full opacity-20 animate-blob-1 will-change-transform pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle, rgba(16, 185, 129, 0.45) 0%, rgba(13, 148, 136, 0.2) 45%, transparent 70%)',
+          filter: 'blur(80px)',
+          transform: 'translate3d(0, 0, 0)',
+        }}
+      />
 
-      {/* ── Theme: Dark Theme Ambient Aura ── */}
-      {isDark && (
-        <>
-          <div
-            className="absolute -top-[10%] -left-[5%] w-[300px] sm:w-[500px] h-[300px] sm:h-[500px] rounded-full opacity-15 animate-blob-1 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #22C55E 0%, #0F766E 50%, transparent 70%)',
-              filter: 'blur(70px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-          <div
-            className="absolute -bottom-[15%] right-[0%] w-[320px] sm:w-[550px] h-[320px] sm:h-[550px] rounded-full opacity-12 animate-blob-2 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #10B981 0%, transparent 70%)',
-              filter: 'blur(75px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-        </>
-      )}
+      {/* ── Bottom-Right Ambient Cyan/Teal Glow Orb ── */}
+      <div
+        className="absolute -bottom-[15%] -right-[8%] w-[400px] sm:w-[700px] h-[400px] sm:h-[700px] rounded-full opacity-18 animate-blob-2 will-change-transform pointer-events-none"
+        style={{
+          background: 'radial-gradient(circle, rgba(20, 184, 166, 0.4) 0%, rgba(6, 182, 212, 0.15) 50%, transparent 70%)',
+          filter: 'blur(90px)',
+          transform: 'translate3d(0, 0, 0)',
+        }}
+      />
 
-      {/* ── Theme: Light Theme Ambient Aura ── */}
-      {!isDark && !isLiquid && (
-        <>
-          <div
-            className="absolute -top-[10%] right-[5%] w-[280px] sm:w-[450px] h-[280px] sm:h-[450px] rounded-full opacity-35 animate-blob-1 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #FEF08A 0%, #BBF7D0 50%, transparent 70%)',
-              filter: 'blur(70px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-          <div
-            className="absolute -bottom-[10%] left-[5%] w-[280px] sm:w-[400px] h-[280px] sm:h-[400px] rounded-full opacity-30 animate-blob-2 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #DCFCE7 0%, transparent 70%)',
-              filter: 'blur(70px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-        </>
+      {/* ── Center Soft Deep Horizon Light ── */}
+      <div
+        className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] sm:w-[1000px] h-[300px] sm:h-[450px] rounded-full opacity-10 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at center, rgba(52, 211, 153, 0.3) 0%, transparent 70%)',
+          filter: 'blur(95px)',
+        }}
+      />
+
+      {/* ── Interactive Cursor Spatial Ambient Spotlight ── */}
+      {!isTouchDevice && (
+        <div
+          className="absolute w-[450px] h-[450px] rounded-full opacity-12 transition-transform duration-75 ease-out will-change-transform pointer-events-none"
+          style={{
+            transform: `translate3d(${mousePos.x - 225}px, ${mousePos.y - 225}px, 0)`,
+            background: 'radial-gradient(circle, rgba(16, 185, 129, 0.5) 0%, rgba(20, 184, 166, 0.2) 45%, transparent 70%)',
+            filter: 'blur(65px)',
+          }}
+        />
       )}
     </div>
   );

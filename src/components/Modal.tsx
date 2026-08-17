@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
-import { useFarmStore } from '@/store/useFarmStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ModalProps {
@@ -14,9 +13,6 @@ interface ModalProps {
 }
 
 export default function Modal({ isOpen, onClose, title, children, size = 'md' }: ModalProps) {
-  const theme = useFarmStore((state) => state.theme);
-  const isLiquid = theme === 'obsidian' || theme === 'liquid-glass' || theme === 'liquid';
-
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -46,33 +42,31 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' }:
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
         >
-          {/* Unified Backdrop */}
+          {/* Spatial Backdrop */}
           <div
-            className="fixed inset-0 bg-black/70 backdrop-blur-md"
+            className="fixed inset-0 bg-black/75 backdrop-blur-xl transition-opacity duration-300"
             onClick={onClose}
           />
 
-          {/* Modal Box - simultaneous unified synchronized entrance */}
+          {/* Spatial Glass Modal Box */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 12 }}
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 8 }}
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className={`relative w-full ${sizeClasses[size]} ${
-              isLiquid ? 'liquid-panel' : 'bg-[var(--bg-card)] border border-[var(--border-color)] shadow-2xl'
-            } rounded-3xl flex flex-col max-h-[90vh] z-10 overflow-hidden`}
+            exit={{ opacity: 0, scale: 0.94, y: 10 }}
+            transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
+            className={`relative w-full ${sizeClasses[size]} spatial-glass-elevated rounded-[2rem] flex flex-col max-h-[90vh] z-10 overflow-hidden shadow-2xl`}
           >
             {/* Header */}
-            <div className="flex items-center justify-between px-6 py-5 border-b border-[var(--border-color)]">
-              <h2 className="text-lg font-bold text-[var(--text-primary)] tracking-tight">
+            <div className="flex items-center justify-between px-6 py-5 border-b border-white/10 bg-white/5">
+              <h2 className="text-base sm:text-lg font-black text-[var(--text-primary)] tracking-tight">
                 {title}
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-colors cursor-pointer"
+                className="p-2 rounded-xl text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-white/10 transition-colors cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>

@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Mic, MicOff, Volume2, Brain, Square, Sparkles, CheckCircle2, XCircle, Clock, Check } from 'lucide-react';
+import { Mic, MicOff, Volume2, Brain, Square, Sparkles, CheckCircle2, XCircle, Zap } from 'lucide-react';
 import { ConversationState } from '@/lib/chickai/types';
 
 interface ChickAIVoiceVisualizerProps {
@@ -23,28 +23,28 @@ export default function ChickAIVoiceVisualizer({
   const getStatusText = () => {
     switch (state) {
       case 'LISTENING':
-        return '🔴 Listening to you...';
+        return 'Listening to your voice...';
       case 'THINKING':
-        return '🧠 Thinking...';
+        return 'Analyzing biometrics & records...';
       case 'SPEAKING':
-        return '🔊 Speaking (Tap to stop)';
+        return 'Speaking telemetry (Tap to interrupt)';
       case 'WAITING_FOR_CONFIRMATION':
-        return '⏳ Waiting for confirmation (Say "Yes" or "Cancel")';
+        return 'Awaiting confirmation ("Yes, save" or "Cancel")';
       case 'WAITING_FOR_INFORMATION':
-        return '❓ Waiting for category or batch';
+        return 'Please specify batch or expense category';
       case 'EXECUTING_ACTION':
-        return '⚡ Updating farm database...';
+        return 'Writing live updates to database...';
       case 'ACTION_COMPLETED':
-        return '✓ Action executed successfully';
+        return '✓ Database transaction completed';
       case 'CANCELLED':
-        return '↩ Action cancelled';
+        return 'Action cancelled';
       case 'IDLE':
       default:
-        return '● Ready for commands';
+        return 'Spatial AI Command Center Ready';
     }
   };
 
-  const getStatusColor = () => {
+  const getStatusBadgeColor = () => {
     switch (state) {
       case 'LISTENING':
         return 'text-rose-400 border-rose-500/40 bg-rose-500/10 shadow-rose-500/20';
@@ -67,187 +67,149 @@ export default function ChickAIVoiceVisualizer({
   };
 
   return (
-    <div className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-neutral-950/80 border border-[var(--border-color)] backdrop-blur-xl overflow-hidden shadow-2xl">
+    <div className="relative flex flex-col items-center justify-center p-6 rounded-3xl bg-[var(--bg-card)] border border-[var(--border-color)] backdrop-blur-2xl overflow-hidden shadow-2xl spatial-glass">
       {/* Background Holographic Hex Grid & Glow */}
       <div className="absolute inset-0 bg-radial-gradient from-teal-500/10 via-transparent to-transparent pointer-events-none" />
 
-      {/* Floating Holographic Ring Particles */}
+      {/* Floating Holographic Ambient Orbs */}
       <div className="absolute -top-10 -right-10 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
       <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-teal-500/10 rounded-full blur-2xl pointer-events-none" />
 
-      {/* Top Telemetry Header */}
-      <div className="w-full flex items-center justify-between text-[10px] tracking-widest text-[var(--text-muted)] uppercase mb-4 z-10 font-mono">
-        <span className="flex items-center gap-1.5 text-teal-300 font-bold">
-          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-          <span>✨ CHICKAI CONVERSATIONAL COPILOT</span>
-        </span>
-        <span className="text-[var(--text-secondary)]">{autoSpeak ? 'AUTO-VOICE: ON' : 'AUTO-VOICE: OFF'}</span>
+      {/* ── Spatial Glass Header ── */}
+      <div className="w-full flex items-center justify-between text-[11px] tracking-widest text-[var(--text-muted)] uppercase mb-4 z-10 font-mono">
+        <div className="flex flex-col">
+          <span className="flex items-center gap-1.5 text-emerald-300 font-extrabold text-xs">
+            <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+            <span>✨ CHICKAI</span>
+          </span>
+          <span className="text-[9px] text-[var(--text-muted)] tracking-wider">
+            FARM INTELLIGENCE
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-bold">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>ONLINE</span>
+          </span>
+        </div>
       </div>
 
-      {/* Central Circular AI Core */}
+      {/* ── Central Holographic AI Core ── */}
       <div className="relative flex items-center justify-center my-4">
-        {/* Outer Orbital Ring 1 */}
+        {/* Outer Orbital Ring 1 (Rotating) */}
         <motion.div
           animate={{
             rotate: 360,
             scale: state === 'SPEAKING' ? [1, 1.08, 1] : state === 'LISTENING' ? [1, 1.15, 1] : 1,
           }}
           transition={{
-            rotate: { duration: state === 'SPEAKING' ? 6 : 14, repeat: Infinity, ease: 'linear' },
+            rotate: { duration: state === 'SPEAKING' ? 6 : state === 'THINKING' ? 4 : 14, repeat: Infinity, ease: 'linear' },
             scale: { duration: 1.2, repeat: Infinity, ease: 'easeInOut' },
           }}
           className={`w-36 h-36 rounded-full border border-dashed pointer-events-none ${
             state === 'LISTENING'
-              ? 'border-rose-400/60 shadow-[0_0_25px_rgba(244,63,94,0.3)]'
+              ? 'border-rose-400/60 shadow-lg shadow-rose-500/20'
               : state === 'SPEAKING'
-              ? 'border-emerald-400/60 shadow-[0_0_30px_rgba(16,185,129,0.35)]'
+              ? 'border-emerald-400/60 shadow-lg shadow-emerald-500/25'
               : state === 'THINKING' || state === 'EXECUTING_ACTION'
-              ? 'border-amber-400/60 shadow-[0_0_25px_rgba(245,158,11,0.3)]'
+              ? 'border-amber-400/60 shadow-lg shadow-amber-500/25'
               : 'border-teal-500/30'
           }`}
         />
 
-        {/* Outer Orbital Ring 2 */}
+        {/* Outer Orbital Ring 2 (Counter-Rotating) */}
         <motion.div
           animate={{
             rotate: -360,
+            scale: state === 'SPEAKING' ? [1.05, 1, 1.05] : 1,
           }}
-          transition={{ duration: 18, repeat: Infinity, ease: 'linear' }}
-          className="absolute w-44 h-44 rounded-full border border-dotted border-white/10 pointer-events-none"
+          transition={{
+            rotate: { duration: state === 'THINKING' ? 5 : 18, repeat: Infinity, ease: 'linear' },
+            scale: { duration: 1.4, repeat: Infinity, ease: 'easeInOut' },
+          }}
+          className="absolute w-28 h-28 rounded-full border border-dotted border-white/15 pointer-events-none"
         />
 
-        {/* Central Core Sphere Button */}
-        <motion.button
-          type="button"
-          whileHover={{ scale: 1.06 }}
-          whileTap={{ scale: 0.94 }}
+        {/* Expanding Waveform Rings when Speaking/Listening */}
+        {(state === 'SPEAKING' || state === 'LISTENING') && (
+          <motion.div
+            animate={{ scale: [1, 1.4, 1.8], opacity: [0.6, 0.2, 0] }}
+            transition={{ duration: 1.6, repeat: Infinity, ease: 'easeOut' }}
+            className={`absolute w-24 h-24 rounded-full border ${
+              state === 'LISTENING' ? 'border-rose-400' : 'border-emerald-400'
+            }`}
+          />
+        )}
+
+        {/* Inner Interactive AI Core Button */}
+        <button
           onClick={state === 'SPEAKING' ? onStopSpeech : onMicClick}
-          className={`relative z-20 w-24 h-24 rounded-full flex flex-col items-center justify-center transition-all cursor-pointer shadow-xl ${
+          className={`relative z-20 w-20 h-20 rounded-full flex flex-col items-center justify-center transition-all duration-300 shadow-2xl cursor-pointer ${
             state === 'LISTENING'
-              ? 'bg-gradient-to-tr from-rose-600 via-red-500 to-rose-400 text-white shadow-rose-500/40 ring-4 ring-rose-400/30'
+              ? 'bg-gradient-to-tr from-rose-600 to-rose-400 text-white shadow-rose-500/40 ring-4 ring-rose-500/30 scale-105 animate-pulse'
               : state === 'SPEAKING'
-              ? 'bg-gradient-to-tr from-emerald-600 via-teal-500 to-cyan-400 text-white shadow-emerald-500/40 ring-4 ring-emerald-400/30'
+              ? 'bg-gradient-to-tr from-emerald-600 to-teal-400 text-white shadow-emerald-500/40 ring-4 ring-emerald-500/30 hover:scale-105'
               : state === 'THINKING' || state === 'EXECUTING_ACTION'
-              ? 'bg-gradient-to-tr from-amber-600 via-yellow-500 to-amber-400 text-white shadow-amber-500/40 ring-4 ring-amber-400/30'
-              : state === 'WAITING_FOR_CONFIRMATION'
-              ? 'bg-gradient-to-tr from-cyan-600 via-teal-500 to-emerald-400 text-white shadow-cyan-500/40 ring-4 ring-cyan-400/30'
-              : 'bg-gradient-to-tr from-neutral-800 via-neutral-900 to-teal-950 border border-teal-500/40 text-teal-300 hover:border-teal-400'
+              ? 'bg-gradient-to-tr from-amber-600 to-yellow-400 text-white shadow-amber-500/40 ring-4 ring-amber-500/30 animate-spin'
+              : 'bg-gradient-to-tr from-teal-600 to-emerald-500 text-white shadow-teal-500/30 hover:scale-105 hover:shadow-teal-500/50'
           }`}
           title={
             state === 'SPEAKING'
-              ? 'Tap to Interrupt / Stop Speaking'
+              ? 'Click to stop speaking'
               : state === 'LISTENING'
-              ? 'Tap to Finish Speaking'
-              : 'Tap to Speak'
+              ? 'Listening... Click to cancel'
+              : 'Click to speak to ChickAI'
           }
         >
-          {state === 'LISTENING' && (
-            <motion.div animate={{ scale: [1, 1.25, 1] }} transition={{ duration: 1, repeat: Infinity }}>
-              <Mic className="w-8 h-8" />
-            </motion.div>
+          {state === 'LISTENING' ? (
+            <Mic className="w-8 h-8" />
+          ) : state === 'SPEAKING' ? (
+            <Volume2 className="w-8 h-8" />
+          ) : state === 'THINKING' ? (
+            <Brain className="w-8 h-8" />
+          ) : state === 'EXECUTING_ACTION' ? (
+            <Zap className="w-8 h-8" />
+          ) : (
+            <Mic className="w-8 h-8" />
           )}
-
-          {state === 'THINKING' && (
-            <Brain className="w-8 h-8 animate-spin [animation-duration:4s]" />
-          )}
-
-          {state === 'SPEAKING' && (
-            <div className="flex flex-col items-center gap-1">
-              <Square className="w-6 h-6 fill-white text-white" />
-              <span className="text-[9px] font-extrabold uppercase tracking-wider">Stop</span>
-            </div>
-          )}
-
-          {state === 'WAITING_FOR_CONFIRMATION' && (
-            <Clock className="w-8 h-8 animate-pulse" />
-          )}
-
-          {state === 'ACTION_COMPLETED' && (
-            <Check className="w-8 h-8" />
-          )}
-
-          {state === 'CANCELLED' && (
-            <XCircle className="w-8 h-8" />
-          )}
-
-          {state === 'IDLE' && (
-            <Mic className="w-8 h-8 text-teal-400" />
-          )}
-        </motion.button>
+        </button>
       </div>
 
-      {/* Dynamic 16-Band Audio Frequency Equalizer Waveform */}
-      <div className="flex items-center justify-center gap-1 h-8 my-2 z-10 w-full max-w-[280px]">
-        {[...Array(16)].map((_, i) => {
-          const isSpeaking = state === 'SPEAKING';
-          const isListening = state === 'LISTENING';
-          const isThinking = state === 'THINKING' || state === 'EXECUTING_ACTION';
-
-          const height = isSpeaking
-            ? [10, 28, 14, 32, 18, 24, 12, 30, 22, 16, 26, 14, 28, 20, 12, 18][i % 16]
-            : isListening
-            ? [6, 18, 12, 22, 16, 14, 20, 12, 16, 10, 18, 12, 14, 8, 12, 6][i % 16]
-            : isThinking
-            ? [8, 12, 8, 16, 8, 12, 8, 16, 8, 12, 8, 16, 8, 12, 8, 12][i % 16]
-            : 4;
-
-          return (
+      {/* Audio Reactive Frequency Waveform Bar (When Speaking) */}
+      {state === 'SPEAKING' && (
+        <div className="flex items-center gap-1.5 my-2">
+          {[40, 75, 100, 60, 90, 45, 80, 50].map((h, i) => (
             <motion.div
               key={i}
-              animate={{
-                height: [height * 0.4, height, height * 0.4],
-              }}
+              animate={{ height: ['4px', `${h * 0.22}px`, '4px'] }}
               transition={{
-                duration: isSpeaking ? 0.35 + (i % 4) * 0.1 : 0.6,
+                duration: 0.5 + (i % 3) * 0.2,
                 repeat: Infinity,
                 ease: 'easeInOut',
-                delay: i * 0.04,
               }}
-              className={`w-1 rounded-full ${
-                isListening
-                  ? 'bg-rose-400'
-                  : isSpeaking
-                  ? 'bg-emerald-400'
-                  : isThinking
-                  ? 'bg-amber-400'
-                  : 'bg-teal-500/30'
-              }`}
-              style={{ minHeight: 4 }}
+              className="w-1 bg-emerald-400 rounded-full"
             />
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
 
-      {/* Live Interim Transcript or Prompt Helper */}
-      <div className="min-h-7 flex items-center justify-center text-center px-4 z-10 mt-1">
-        {transcript ? (
-          <motion.p
-            initial={{ opacity: 0, y: 3 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-xs font-mono text-teal-200 bg-teal-950/70 border border-teal-400/30 px-3 py-1 rounded-full shadow-sm"
-          >
-            "{transcript}"
-          </motion.p>
-        ) : (
-          <p className="text-[11px] text-[var(--text-muted)] italic">
-            {state === 'SPEAKING'
-              ? 'Say "Stop", "Wait", or tap the core to interrupt'
-              : state === 'WAITING_FOR_CONFIRMATION'
-              ? 'Say "Yes" to save or "Cancel" to discard'
-              : state === 'LISTENING'
-              ? 'Speaking... ChickAI is actively listening'
-              : 'Say or type commands naturally'}
-          </p>
-        )}
-      </div>
-
-      {/* Bottom Status Capsule Badge */}
-      <div className="mt-3 z-10">
-        <span
-          className={`px-3.5 py-1 rounded-full text-[11px] font-bold border transition-all flex items-center gap-1.5 shadow-md ${getStatusColor()}`}
+      {/* Real-time Status Badge & Transcript */}
+      <div className="mt-2 text-center max-w-md z-10 space-y-2">
+        <div
+          className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold border backdrop-blur-md shadow-sm transition-all duration-300 ${getStatusBadgeColor()}`}
         >
+          {state === 'SPEAKING' && <Square className="w-3 h-3 fill-current cursor-pointer" onClick={onStopSpeech} />}
           <span>{getStatusText()}</span>
-        </span>
+        </div>
+
+        {transcript && (
+          <div className="p-2.5 rounded-2xl bg-white/5 border border-white/10 text-xs text-[var(--text-primary)] font-medium max-w-sm mx-auto shadow-inner">
+            <span className="text-[10px] text-teal-400 font-bold uppercase block mb-0.5 font-mono">
+              Live Speech Input:
+            </span>
+            &ldquo;{transcript}&rdquo;
+          </div>
+        )}
       </div>
     </div>
   );
