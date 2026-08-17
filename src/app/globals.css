@@ -60,34 +60,63 @@
 
 
 
-/* ── 4. Spatial Glass Theme (Apple Vision Pro / visionOS Spatial UI) ─────── */
+/* ── 3. Spatial Glass Theme (Apple Vision Pro / Clean Spatial UI) ─────── */
 .spatial, .spatial-glass {
-  --bg-primary: #080B11;
-  --bg-secondary: #0E131E;
-  --bg-card: rgba(22, 28, 42, 0.52);
-  --bg-card-hover: rgba(30, 38, 58, 0.68);
-  --bg-input: rgba(16, 22, 34, 0.65);
-  --bg-sidebar: rgba(12, 16, 26, 0.65);
-  --bg-header: rgba(12, 16, 26, 0.62);
+  --bg-primary: #06090E;
+  --bg-secondary: #0A0F18;
+  --bg-card: rgba(14, 21, 34, 0.65);
+  --bg-card-hover: rgba(20, 30, 48, 0.8);
+  --bg-input: rgba(11, 16, 26, 0.75);
+  --bg-sidebar: rgba(8, 12, 20, 0.72);
+  --bg-header: rgba(8, 12, 20, 0.68);
   --text-primary: #FFFFFF;
   --text-secondary: #CBD5E1;
   --text-muted: #64748B;
-  --border-color: rgba(255, 255, 255, 0.14);
-  --border-hover: rgba(255, 255, 255, 0.35);
-  --shadow-color: rgba(0, 0, 0, 0.8);
+  --border-color: rgba(255, 255, 255, 0.12);
+  --border-hover: rgba(255, 255, 255, 0.32);
+  --shadow-color: rgba(0, 0, 0, 0.85);
   --shadow-lg: 0 32px 85px -15px rgba(0, 0, 0, 0.95);
   --accent-color: #38BDF8;
-  --accent-glow: rgba(56, 189, 248, 0.4);
+  --accent-glow: rgba(56, 189, 248, 0.35);
   --card-blur: blur(36px);
-  --card-bg-glass: rgba(22, 28, 42, 0.52);
-  --badge-yellow: rgba(245, 158, 11, 0.25);
+  --card-bg-glass: rgba(14, 21, 34, 0.65);
+  --badge-yellow: rgba(245, 158, 11, 0.22);
   --badge-yellow-text: #FCD34D;
 
-  /* VisionOS Pure Optical Glass Tokens */
-  --spatial-glass-bg: rgba(20, 26, 40, 0.52);
-  --spatial-glass-border: rgba(255, 255, 255, 0.16);
+  /* VisionOS Clean Optical Glass Tokens */
+  --spatial-glass-bg: rgba(14, 21, 34, 0.65);
+  --spatial-glass-border: rgba(255, 255, 255, 0.15);
   --spatial-glass-highlight: rgba(255, 255, 255, 0.32);
-  --spatial-shadow-deep: 0 32px 85px -15px rgba(0, 0, 0, 0.92), 0 0 1px 1px rgba(255, 255, 255, 0.14);
+  --spatial-shadow-deep: 0 32px 85px -15px rgba(0, 0, 0, 0.92), 0 0 1px 1px rgba(255, 255, 255, 0.12);
+}
+
+/* ── 4. Vibe Theme (Cyber Nebula & Sunset Aura) ───────────────────────── */
+.vibe {
+  --bg-primary: #070512;
+  --bg-secondary: #0D091F;
+  --bg-card: rgba(25, 17, 48, 0.62);
+  --bg-card-hover: rgba(36, 24, 68, 0.78);
+  --bg-input: rgba(18, 12, 36, 0.75);
+  --bg-sidebar: rgba(10, 7, 22, 0.85);
+  --bg-header: rgba(10, 7, 22, 0.75);
+  --text-primary: #FAF5FF;
+  --text-secondary: #D8B4FE;
+  --text-muted: #8B5CF6;
+  --border-color: rgba(168, 85, 247, 0.22);
+  --border-hover: rgba(236, 72, 153, 0.45);
+  --shadow-color: rgba(0, 0, 0, 0.85);
+  --shadow-lg: 0 28px 75px rgba(10, 5, 25, 0.95);
+  --accent-color: #C084FC;
+  --accent-glow: rgba(192, 132, 252, 0.4);
+  --card-blur: blur(30px);
+  --card-bg-glass: rgba(25, 17, 48, 0.62);
+  --badge-yellow: rgba(244, 63, 94, 0.2);
+  --badge-yellow-text: #FDA4AF;
+
+  --spatial-glass-bg: rgba(25, 17, 48, 0.62);
+  --spatial-glass-border: rgba(168, 85, 247, 0.25);
+  --spatial-glass-highlight: rgba(255, 255, 255, 0.25);
+  --spatial-shadow-deep: 0 30px 80px rgba(0, 0, 0, 0.9), 0 0 20px rgba(168, 85, 247, 0.2);
 }
 
 /* ── Base Styles ──────────────────────────────────────────────────────── */

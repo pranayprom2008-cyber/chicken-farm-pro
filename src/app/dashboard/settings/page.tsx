@@ -12,6 +12,7 @@ import {
   Sun,
   Moon,
   Sparkles,
+  Glasses,
   CheckCircle,
   Database,
   ShieldCheck,
@@ -275,8 +276,8 @@ export default function SettingsPage() {
                 : 'border-[var(--border-color)] hover:border-sky-500/40'
             }`}
           >
-            <div className="w-full h-20 bg-[#080B11] rounded-xl mb-3 border border-white/20 flex flex-col justify-between p-2.5 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/15 via-transparent to-amber-500/10 backdrop-blur-md pointer-events-none" />
+            <div className="w-full h-20 bg-[#06090E] rounded-xl mb-3 border border-white/20 flex flex-col justify-between p-2.5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 via-transparent to-white/5 backdrop-blur-md pointer-events-none" />
               <div className="flex gap-1 relative z-10">
                 <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
                 <span className="w-8 h-2 rounded bg-white/30" />
@@ -285,10 +286,37 @@ export default function SettingsPage() {
             </div>
             <div className="flex items-center justify-between">
               <span className="font-bold text-xs text-sky-300">Spatial Glass</span>
-              <Sparkles className="w-4 h-4 text-sky-400" />
+              <Glasses className="w-4 h-4 text-sky-400" />
             </div>
             <p className="text-[11px] text-[var(--text-muted)] mt-1">
-              Apple visionOS optical glass & spatial room depth
+              Apple visionOS clean optical glass & spatial room depth
+            </p>
+          </button>
+
+          {/* Vibe Theme */}
+          <button
+            type="button"
+            onClick={() => setTheme('vibe')}
+            className={`p-5 rounded-2xl border text-left transition-all ${
+              theme === 'vibe'
+                ? 'border-purple-400 ring-2 ring-purple-500/30 bg-purple-950/20 shadow-lg'
+                : 'border-[var(--border-color)] hover:border-purple-500/40'
+            }`}
+          >
+            <div className="w-full h-20 bg-[#070512] rounded-xl mb-3 border border-purple-500/30 flex flex-col justify-between p-2.5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-purple-600/25 to-pink-500/20 backdrop-blur-md pointer-events-none" />
+              <div className="flex gap-1 relative z-10">
+                <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse" />
+                <span className="w-8 h-2 rounded bg-purple-300/30" />
+              </div>
+              <div className="w-16 h-3 rounded bg-pink-500/40 relative z-10" />
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-bold text-xs text-purple-300">Vibe</span>
+              <Sparkles className="w-4 h-4 text-purple-400" />
+            </div>
+            <p className="text-[11px] text-[var(--text-muted)] mt-1">
+              Cyber sunset aura, twilight nebula & neon accents
             </p>
           </button>
         </div>

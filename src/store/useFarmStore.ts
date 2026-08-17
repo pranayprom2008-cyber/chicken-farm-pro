@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Theme = 'light' | 'dark' | 'spatial' | 'spatial-glass' | 'liquid' | 'obsidian' | 'liquid-glass';
+export type Theme = 'light' | 'dark' | 'spatial' | 'spatial-glass' | 'vibe' | 'liquid' | 'obsidian' | 'liquid-glass';
 
 export const ALLOWED_PHONES = ['9502828293', '9849852085'];
 
@@ -357,11 +357,13 @@ export const useFarmStore = create<FarmState>()(
         set({ theme: normalizedTheme });
         if (typeof document !== 'undefined') {
           const root = document.documentElement;
-          root.classList.remove('dark', 'spatial', 'spatial-glass', 'light', 'liquid', 'obsidian', 'liquid-glass');
+          root.classList.remove('dark', 'spatial', 'spatial-glass', 'light', 'vibe', 'liquid', 'obsidian', 'liquid-glass');
           if (normalizedTheme === 'light') {
             root.classList.add('light');
           } else if (normalizedTheme === 'spatial') {
             root.classList.add('spatial', 'spatial-glass', 'dark');
+          } else if (normalizedTheme === 'vibe') {
+            root.classList.add('vibe', 'dark');
           } else {
             root.classList.add('dark');
           }

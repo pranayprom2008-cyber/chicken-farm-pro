@@ -37,13 +37,16 @@ export default function RootLayout({
                   const parsed = JSON.parse(stored);
                   const theme = parsed?.state?.theme;
                   if (theme === 'light') {
-                    document.documentElement.classList.remove('dark', 'spatial', 'spatial-glass', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.remove('dark', 'spatial', 'spatial-glass', 'vibe', 'liquid', 'liquid-glass', 'obsidian');
                     document.documentElement.classList.add('light');
                   } else if (theme === 'spatial' || theme === 'spatial-glass') {
-                    document.documentElement.classList.remove('light', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.remove('light', 'vibe', 'liquid', 'liquid-glass', 'obsidian');
                     document.documentElement.classList.add('spatial', 'spatial-glass', 'dark');
-                  } else {
+                  } else if (theme === 'vibe') {
                     document.documentElement.classList.remove('light', 'spatial', 'spatial-glass', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.add('vibe', 'dark');
+                  } else {
+                    document.documentElement.classList.remove('light', 'spatial', 'spatial-glass', 'vibe', 'liquid', 'liquid-glass', 'obsidian');
                     document.documentElement.classList.add('dark');
                   }
                 } else {

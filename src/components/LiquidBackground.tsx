@@ -9,6 +9,7 @@ export default function LiquidBackground() {
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   const isSpatial = theme === 'spatial' || theme === 'spatial-glass';
+  const isVibe = theme === 'vibe';
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -35,49 +36,95 @@ export default function LiquidBackground() {
 
   return (
     <div className="fixed inset-0 pointer-events-none z-0 overflow-hidden select-none">
-      {/* ── 🥽 Theme: visionOS Spatial Immersion Environment ── */}
+      {/* ── 🥽 Theme: Clean Apple Vision Pro Spatial UI (No Green, Pure Optical Glass Depth) ── */}
       {isSpatial && (
         <>
-          {/* Spatial Delicate Perspective Grid */}
-          <div className="absolute inset-0 spatial-grid-canvas opacity-45" />
+          {/* Spatial Delicate Perspective Depth Canvas */}
+          <div className="absolute inset-0 spatial-grid-canvas opacity-35" />
 
-          {/* Warm Interior Studio / Horizon Ambient Lighting (Top-Right) */}
+          {/* Clean Studio Horizon Ambient Light (Top-Right: Warm Crystal Studio) */}
           <div
-            className="absolute -top-[18%] -right-[10%] w-[500px] sm:w-[850px] h-[500px] sm:h-[850px] rounded-full opacity-35 animate-blob-1 will-change-transform"
+            className="absolute -top-[16%] -right-[12%] w-[500px] sm:w-[850px] h-[500px] sm:h-[850px] rounded-full opacity-25 animate-blob-1 will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(251, 146, 60, 0.28) 0%, rgba(217, 119, 6, 0.12) 45%, transparent 70%)',
+              background: 'radial-gradient(circle, rgba(217, 119, 6, 0.22) 0%, rgba(245, 158, 11, 0.08) 45%, transparent 70%)',
               filter: 'blur(110px)',
               transform: 'translate3d(0, 0, 0)',
             }}
           />
 
-          {/* VisionOS Sky-Cyan Atmosphere (Top-Left) */}
+          {/* Clean Optical Sky-Cyan Atmosphere (Top-Left: Pure Ice Cyan) */}
           <div
-            className="absolute -top-[12%] -left-[12%] w-[480px] sm:w-[800px] h-[480px] sm:h-[800px] rounded-full opacity-30 animate-blob-2 will-change-transform"
+            className="absolute -top-[14%] -left-[14%] w-[500px] sm:w-[820px] h-[500px] sm:h-[820px] rounded-full opacity-35 animate-blob-2 will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(56, 189, 248, 0.38) 0%, rgba(2, 132, 199, 0.15) 50%, transparent 75%)',
+              background: 'radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, rgba(14, 165, 233, 0.12) 50%, transparent 75%)',
               filter: 'blur(100px)',
               transform: 'translate3d(0, 0, 0)',
             }}
           />
 
-          {/* Deep Forest Emerald Ground Atmosphere (Bottom-Center) */}
+          {/* Subtle Deep Slate Blue Ambient Horizon (Bottom: Pure Deep Navy) */}
           <div
-            className="absolute -bottom-[22%] left-1/2 -translate-x-1/2 w-[600px] sm:w-[1100px] h-[500px] sm:h-[800px] rounded-full opacity-25 will-change-transform"
+            className="absolute -bottom-[20%] left-1/2 -translate-x-1/2 w-[600px] sm:w-[1100px] h-[500px] sm:h-[750px] rounded-full opacity-20 will-change-transform"
             style={{
-              background: 'radial-gradient(circle, rgba(16, 185, 129, 0.3) 0%, rgba(13, 148, 136, 0.15) 50%, transparent 75%)',
+              background: 'radial-gradient(circle, rgba(30, 58, 138, 0.35) 0%, rgba(15, 23, 42, 0.2) 55%, transparent 75%)',
               filter: 'blur(120px)',
             }}
           />
 
-          {/* Interactive VisionOS Specular Cursor Orb */}
+          {/* Interactive VisionOS Specular Cursor Glow */}
           {!isTouchDevice && (
             <div
-              className="absolute w-[500px] h-[500px] rounded-full opacity-22 transition-transform duration-75 ease-out will-change-transform pointer-events-none"
+              className="absolute w-[500px] h-[500px] rounded-full opacity-20 transition-transform duration-75 ease-out will-change-transform pointer-events-none"
               style={{
                 transform: `translate3d(${mousePos.x - 250}px, ${mousePos.y - 250}px, 0)`,
-                background: 'radial-gradient(circle, rgba(56, 189, 248, 0.5) 0%, rgba(251, 146, 60, 0.15) 45%, transparent 70%)',
+                background: 'radial-gradient(circle, rgba(56, 189, 248, 0.45) 0%, rgba(255, 255, 255, 0.12) 40%, transparent 70%)',
                 filter: 'blur(75px)',
+              }}
+            />
+          )}
+        </>
+      )}
+
+      {/* ── 🌌 Theme: Vibe (Cyber Sunset Nebula Aura) ── */}
+      {isVibe && (
+        <>
+          {/* Cyber Sunset Violet Aurora (Top-Left) */}
+          <div
+            className="absolute -top-[18%] -left-[15%] w-[520px] sm:w-[900px] h-[520px] sm:h-[900px] rounded-full opacity-40 animate-blob-1 will-change-transform"
+            style={{
+              background: 'radial-gradient(circle, rgba(168, 85, 247, 0.42) 0%, rgba(126, 34, 206, 0.15) 50%, transparent 75%)',
+              filter: 'blur(100px)',
+              transform: 'translate3d(0, 0, 0)',
+            }}
+          />
+
+          {/* Radiant Neon Rose Pink Aura (Top-Right) */}
+          <div
+            className="absolute -top-[12%] -right-[12%] w-[480px] sm:w-[820px] h-[480px] sm:h-[820px] rounded-full opacity-35 animate-blob-2 will-change-transform"
+            style={{
+              background: 'radial-gradient(circle, rgba(236, 72, 153, 0.38) 0%, rgba(219, 39, 119, 0.12) 50%, transparent 75%)',
+              filter: 'blur(100px)',
+              transform: 'translate3d(0, 0, 0)',
+            }}
+          />
+
+          {/* Deep Indigo Twilight Core (Bottom-Center) */}
+          <div
+            className="absolute -bottom-[22%] left-1/2 -translate-x-1/2 w-[600px] sm:w-[1050px] h-[500px] sm:h-[800px] rounded-full opacity-30 will-change-transform"
+            style={{
+              background: 'radial-gradient(circle, rgba(99, 102, 241, 0.38) 0%, rgba(67, 56, 202, 0.15) 55%, transparent 75%)',
+              filter: 'blur(120px)',
+            }}
+          />
+
+          {/* Interactive Neon Cursor Orb */}
+          {!isTouchDevice && (
+            <div
+              className="absolute w-[450px] h-[450px] rounded-full opacity-25 transition-transform duration-75 ease-out will-change-transform pointer-events-none"
+              style={{
+                transform: `translate3d(${mousePos.x - 225}px, ${mousePos.y - 225}px, 0)`,
+                background: 'radial-gradient(circle, rgba(217, 70, 239, 0.5) 0%, rgba(168, 85, 247, 0.2) 45%, transparent 70%)',
+                filter: 'blur(70px)',
               }}
             />
           )}
@@ -107,7 +154,7 @@ export default function LiquidBackground() {
       )}
 
       {/* ── ☀️ Theme: Daylight Clean Green ── */}
-      {!isDark && !isSpatial && (
+      {!isDark && !isSpatial && !isVibe && (
         <div
           className="absolute -top-[10%] -left-[10%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] rounded-full opacity-10 animate-blob-1 will-change-transform"
           style={{
