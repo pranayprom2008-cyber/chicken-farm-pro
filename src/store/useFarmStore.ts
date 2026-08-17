@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Theme = 'light' | 'dark' | 'liquid' | 'obsidian' | 'liquid-glass';
+export type Theme = 'light' | 'dark' | 'liquid' | 'obsidian' | 'liquid-glass' | 'spatial' | 'spatial-glass';
 
 export const ALLOWED_PHONES = ['9502828293', '9849852085'];
 

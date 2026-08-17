@@ -37,13 +37,16 @@ export default function RootLayout({
                   const parsed = JSON.parse(stored);
                   const theme = parsed?.state?.theme;
                   if (theme === 'light') {
-                    document.documentElement.classList.remove('dark', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.remove('dark', 'liquid', 'liquid-glass', 'obsidian', 'spatial', 'spatial-glass');
                     document.documentElement.classList.add('light');
-                  } else if (theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass') {
-                    document.documentElement.classList.remove('dark', 'light');
-                    document.documentElement.classList.add('liquid', 'liquid-glass', 'obsidian');
-                  } else {
+                  } else if (theme === 'spatial' || theme === 'spatial-glass') {
                     document.documentElement.classList.remove('light', 'liquid', 'liquid-glass', 'obsidian');
+                    document.documentElement.classList.add('spatial', 'spatial-glass', 'dark');
+                  } else if (theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass') {
+                    document.documentElement.classList.remove('dark', 'light', 'spatial', 'spatial-glass');
+                    document.documentElement.classList.add('liquid', 'liquid-glass', 'obsidian', 'dark');
+                  } else {
+                    document.documentElement.classList.remove('light', 'liquid', 'liquid-glass', 'obsidian', 'spatial', 'spatial-glass');
                     document.documentElement.classList.add('dark');
                   }
                 } else {
