@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Sun, Moon, Sparkles, Glasses } from 'lucide-react';
+import { Sun, Moon, Glasses } from 'lucide-react';
 import { useFarmStore } from '@/store/useFarmStore';
 
 export default function ThemeToggle() {
@@ -10,20 +10,18 @@ export default function ThemeToggle() {
   const themes = [
     { id: 'light', icon: Sun, label: 'Light' },
     { id: 'dark', icon: Moon, label: 'Dark' },
-    { id: 'liquid', icon: Sparkles, label: 'Liquid' },
     { id: 'spatial', icon: Glasses, label: 'Spatial' },
   ];
 
   return (
     <div
       className={`p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl ${
-        !sidebarOpen ? 'flex flex-col gap-1' : 'grid grid-cols-2 gap-1 w-full'
+        !sidebarOpen ? 'flex flex-col gap-1' : 'grid grid-cols-3 gap-1 w-full'
       }`}
     >
       {themes.map((t) => {
         const isActive =
           theme === t.id ||
-          (t.id === 'liquid' && (theme === 'obsidian' || theme === 'liquid-glass')) ||
           (t.id === 'spatial' && theme === 'spatial-glass');
         const Icon = t.icon;
 
@@ -39,8 +37,6 @@ export default function ThemeToggle() {
                   ? 'bg-white text-amber-600 shadow-sm border border-amber-200'
                   : t.id === 'dark'
                   ? 'bg-[#15271F] text-emerald-400 shadow-sm border border-[#1C382B]'
-                  : t.id === 'liquid'
-                  ? 'bg-cyan-500/20 text-cyan-300 shadow-sm border border-cyan-500/30'
                   : 'bg-sky-500/25 text-sky-300 shadow-md border border-sky-400/40'
                 : 'text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-white/5'
             }`}

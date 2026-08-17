@@ -3,7 +3,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
-export type Theme = 'light' | 'dark' | 'liquid' | 'obsidian' | 'liquid-glass' | 'spatial' | 'spatial-glass';
+export type Theme = 'light' | 'dark' | 'spatial' | 'spatial-glass' | 'liquid' | 'obsidian' | 'liquid-glass';
 
 export const ALLOWED_PHONES = ['9502828293', '9849852085'];
 
@@ -353,18 +353,17 @@ export const useFarmStore = create<FarmState>()(
       settings: defaultSettings,
 
       setTheme: (theme: Theme) => {
-        const normalizedTheme: Theme =
-          theme === 'obsidian' || theme === 'liquid-glass' ? 'liquid' : theme;
+        const normalizedTheme: Theme = theme === 'spatial-glass' ? 'spatial' : theme;
         set({ theme: normalizedTheme });
         if (typeof document !== 'undefined') {
           const root = document.documentElement;
-          root.classList.remove('dark', 'obsidian', 'liquid-glass', 'liquid', 'organic', 'bubble');
-          if (normalizedTheme === 'dark') {
-            root.classList.add('dark');
-          } else if (normalizedTheme === 'liquid') {
-            root.classList.add('liquid', 'liquid-glass', 'obsidian');
-          } else {
+          root.classList.remove('dark', 'spatial', 'spatial-glass', 'light', 'liquid', 'obsidian', 'liquid-glass');
+          if (normalizedTheme === 'light') {
             root.classList.add('light');
+          } else if (normalizedTheme === 'spatial') {
+            root.classList.add('spatial', 'spatial-glass', 'dark');
+          } else {
+            root.classList.add('dark');
           }
         }
       },
@@ -384,7 +383,9 @@ export const useFarmStore = create<FarmState>()(
             role: isJohn ? 'Farm Owner' : 'Manager & Tech Lead',
           };
           set({ user: userObj, isAuthenticated: true });
-          get().recalculateStats();
+
+          // Immediately sync all cloud farm data
+          await get().syncAll();
 
           // Try server login in background
           try {
@@ -415,8 +416,30 @@ export const useFarmStore = create<FarmState>()(
         set({ stats: newStats });
       },
 
-      // Universal Safe Sync (never overwrites client data if server is empty)
+      // Universal Cloud Sync across all laptops & devices
       syncAll: async () => {
+        try {
+          const res = await fetch('/api/sync', { cache: 'no-store' });
+          if (res.ok) {
+            const cloudData = await res.json();
+            if (cloudData) {
+              set((s) => ({
+                batches: Array.isArray(cloudData.batches) ? cloudData.batches : s.batches,
+                expenses: Array.isArray(cloudData.expenses) ? cloudData.expenses : s.expenses,
+                sales: Array.isArray(cloudData.sales) ? cloudData.sales : s.sales,
+                billingHistory: Array.isArray(cloudData.billingHistory) ? cloudData.billingHistory : s.billingHistory,
+                notifications: Array.isArray(cloudData.notifications) ? cloudData.notifications : s.notifications,
+                settings: cloudData.settings ? { ...s.settings, ...cloudData.settings } : s.settings,
+                lastSyncedAt: new Date().toISOString(),
+              }));
+              get().recalculateStats();
+              return;
+            }
+          }
+        } catch (e) {
+          console.warn('Sync fallback:', e);
+        }
+
         await Promise.allSettled([
           get().fetchBatches(),
           get().fetchExpenses(),
@@ -1023,12 +1046,7 @@ export const useFarmStore = create<FarmState>()(
         user: state.user,
         isAuthenticated: state.isAuthenticated,
         theme: state.theme,
-        batches: state.batches,
-        expenses: state.expenses,
-        billingHistory: state.billingHistory,
-        notifications: state.notifications,
         settings: state.settings,
-        stats: state.stats,
       }),
     }
   )

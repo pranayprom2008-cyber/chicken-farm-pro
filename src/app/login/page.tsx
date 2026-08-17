@@ -82,18 +82,11 @@ export default function LoginPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
             ChickFarm Pro
           </h1>
-          <p className="text-xs sm:text-sm text-[var(--text-muted)] mt-1 font-medium">
-            Commercial Poultry OS • Interactive 3D Edition
-          </p>
         </div>
 
         {/* Login 3D Tilt Card */}
-        <TiltCard maxTilt={8} glare={true}>
-          <div
-            className={`p-6 sm:p-8 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
-              isLiquid ? 'liquid-panel' : 'shadow-xl'
-            }`}
-          >
+        <TiltCard maxTilt={6} glare={true}>
+          <div className="p-6 sm:p-8 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-base font-bold text-[var(--text-primary)]">
                 Authorized Phone Access

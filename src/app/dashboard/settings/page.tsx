@@ -265,30 +265,30 @@ export default function SettingsPage() {
             </p>
           </button>
 
-          {/* Liquid Theme */}
+          {/* Spatial Glass Theme */}
           <button
             type="button"
-            onClick={() => setTheme('liquid')}
+            onClick={() => setTheme('spatial')}
             className={`p-5 rounded-2xl border text-left transition-all ${
-              theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass'
-                ? 'border-cyan-400 ring-2 ring-cyan-500/20 bg-cyan-950/20'
-                : 'border-[var(--border-color)] hover:border-cyan-500/40'
+              theme === 'spatial' || theme === 'spatial-glass'
+                ? 'border-sky-400 ring-2 ring-sky-500/30 bg-sky-950/20 shadow-lg'
+                : 'border-[var(--border-color)] hover:border-sky-500/40'
             }`}
           >
-            <div className="w-full h-20 bg-[#04060A] rounded-xl mb-3 border border-white/10 flex flex-col justify-between p-2.5 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-violet-600/20 to-cyan-500/20 backdrop-blur-md pointer-events-none" />
+            <div className="w-full h-20 bg-[#080B11] rounded-xl mb-3 border border-white/20 flex flex-col justify-between p-2.5 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/15 via-transparent to-amber-500/10 backdrop-blur-md pointer-events-none" />
               <div className="flex gap-1 relative z-10">
-                <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse" />
-                <span className="w-8 h-2 rounded bg-white/20" />
+                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
+                <span className="w-8 h-2 rounded bg-white/30" />
               </div>
-              <div className="w-16 h-3 rounded bg-cyan-500/30 relative z-10" />
+              <div className="w-16 h-3 rounded bg-sky-500/40 relative z-10" />
             </div>
             <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-cyan-300">Liquid</span>
-              <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span className="font-bold text-xs text-sky-300">Spatial Glass</span>
+              <Sparkles className="w-4 h-4 text-sky-400" />
             </div>
             <p className="text-[11px] text-[var(--text-muted)] mt-1">
-              Frosted glass, ambient blobs & neon glow
+              Apple visionOS optical glass & spatial room depth
             </p>
           </button>
         </div>

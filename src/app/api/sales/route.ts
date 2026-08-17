@@ -1,21 +1,24 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import { cloudDb } from '@/lib/cloudStore';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET(req: Request) {
   try {
-    const { searchParams } = new URL(req.url);
-    const batchId = searchParams.get('batchId');
+    const cloudSales = await cloudDb.get<any[]>('sales');
+    if (Array.isArray(cloudSales) && cloudSales.length > 0) {
+      return NextResponse.json(cloudSales);
+    }
 
     const sales = await prisma.sales.findMany({
-      where: batchId && batchId !== 'all' ? { batchId } : undefined,
       include: { batch: true },
       orderBy: { saleDate: 'desc' },
     });
 
-    return NextResponse.json(sales);
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to fetch sales';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(sales || []);
+  } catch (error: any) {
+    return NextResponse.json([]);
   }
 }
 
@@ -24,62 +27,48 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { batchId, chickensSold, averageWeight, pricePerKg, totalRevenue, buyer, notes, saleDate } = body;
 
-    const sold = Number(chickensSold);
-    const avgW = Number(averageWeight) || 2.2; // default 2.2kg
-    const rate = Number(pricePerKg);
+    const sold = Number(chickensSold) || 0;
+    const avgW = Number(averageWeight) || 2.2;
+    const rate = Number(pricePerKg) || 115;
+    const calculatedRevenue = Number(totalRevenue) > 0 ? Number(totalRevenue) : sold * avgW * rate;
 
-    const calculatedRevenue = totalRevenue !== undefined && Number(totalRevenue) > 0
-      ? Number(totalRevenue)
-      : sold * avgW * rate;
+    const newSale = {
+      id: body.id || `SALE-${Date.now()}`,
+      batchId: batchId || null,
+      chickensSold: sold,
+      averageWeight: avgW,
+      pricePerKg: rate,
+      totalRevenue: calculatedRevenue,
+      buyer: buyer || 'Wholesale Buyer',
+      notes: notes || '',
+      saleDate: saleDate ? new Date(saleDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString(),
+    };
 
-    if (!sold || sold <= 0 || calculatedRevenue <= 0) {
-      return NextResponse.json(
-        { error: 'Valid number of chickens sold and selling price/revenue are required' },
-        { status: 400 }
-      );
-    }
+    const currentSales = (await cloudDb.get<any[]>('sales')) || [];
+    const updatedSales = [newSale, ...currentSales.filter((s) => s.id !== newSale.id)];
+    await cloudDb.saveSales(updatedSales);
 
-    const sale = await prisma.sales.create({
-      data: {
-        batchId: batchId || null,
-        chickensSold: sold,
-        averageWeight: avgW,
-        pricePerKg: rate || calculatedRevenue / (sold * avgW),
-        totalRevenue: calculatedRevenue,
-        buyer: buyer || 'Wholesale Buyer',
-        notes: notes || '',
-        saleDate: saleDate ? new Date(saleDate) : new Date(),
-      },
-    });
-
-    // If batch associated, check if batch is completed
-    if (batchId) {
-      const batch = await prisma.batch.findUnique({
-        where: { id: batchId },
-        include: { salesRecords: true },
+    try {
+      await prisma.sales.create({
+        data: {
+          id: newSale.id,
+          batchId: newSale.batchId,
+          chickensSold: newSale.chickensSold,
+          averageWeight: newSale.averageWeight,
+          pricePerKg: newSale.pricePerKg,
+          totalRevenue: newSale.totalRevenue,
+          buyer: newSale.buyer,
+          notes: newSale.notes,
+          saleDate: new Date(newSale.saleDate),
+        },
       });
-      if (batch) {
-        const totalSold = batch.salesRecords.reduce((s, r) => s + r.chickensSold, 0) + sold;
-        if (totalSold >= batch.aliveChicks) {
-          await prisma.batch.update({
-            where: { id: batchId },
-            data: { status: 'completed', actualEndDate: new Date() },
-          });
-        }
-      }
+    } catch {
+      // Ephemeral fallback
     }
 
-    await prisma.activityLog.create({
-      data: {
-        action: 'RECORD_SALE',
-        details: `Recorded sale of ${sold} chickens for ₹${calculatedRevenue.toLocaleString()}`,
-        user: 'Admin',
-      },
-    });
-
-    return NextResponse.json(sale, { status: 201 });
-  } catch (error: unknown) {
-    const message = error instanceof Error ? error.message : 'Failed to record sale';
-    return NextResponse.json({ error: message }, { status: 500 });
+    return NextResponse.json(newSale, { status: 201 });
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to create sale' }, { status: 500 });
   }
 }

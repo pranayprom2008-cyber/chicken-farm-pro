@@ -9,7 +9,6 @@ export default function LiquidBackground() {
   const [isTouchDevice, setIsTouchDevice] = useState(false);
 
   const isSpatial = theme === 'spatial' || theme === 'spatial-glass';
-  const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
   const isDark = theme === 'dark';
 
   useEffect(() => {
@@ -85,39 +84,6 @@ export default function LiquidBackground() {
         </>
       )}
 
-      {/* ── 💧 Theme: Cyber Frosted Liquid Neon Glass ── */}
-      {isLiquid && (
-        <>
-          <div
-            className="absolute -top-[15%] -left-[10%] w-[380px] sm:w-[680px] h-[380px] sm:h-[680px] rounded-full opacity-25 animate-blob-1 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #8B5CF6 0%, #06B6D4 50%, transparent 70%)',
-              filter: 'blur(75px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-          <div
-            className="absolute -bottom-[20%] -right-[10%] w-[400px] sm:w-[720px] h-[400px] sm:h-[720px] rounded-full opacity-22 animate-blob-2 will-change-transform"
-            style={{
-              background: 'radial-gradient(circle, #00E5FF 0%, #10B981 50%, transparent 70%)',
-              filter: 'blur(80px)',
-              transform: 'translate3d(0, 0, 0)',
-            }}
-          />
-
-          {!isTouchDevice && (
-            <div
-              className="absolute w-[420px] h-[420px] rounded-full opacity-15 transition-transform duration-100 ease-out will-change-transform"
-              style={{
-                transform: `translate3d(${mousePos.x - 210}px, ${mousePos.y - 210}px, 0)`,
-                background: 'radial-gradient(circle, rgba(0, 229, 255, 0.4) 0%, rgba(139, 92, 246, 0.15) 45%, transparent 70%)',
-                filter: 'blur(55px)',
-              }}
-            />
-          )}
-        </>
-      )}
-
       {/* ── 🌙 Theme: Dark Forest Atmosphere ── */}
       {isDark && (
         <>
@@ -141,7 +107,7 @@ export default function LiquidBackground() {
       )}
 
       {/* ── ☀️ Theme: Daylight Clean Green ── */}
-      {!isDark && !isLiquid && !isSpatial && (
+      {!isDark && !isSpatial && (
         <div
           className="absolute -top-[10%] -left-[10%] w-[400px] sm:w-[600px] h-[400px] sm:h-[600px] rounded-full opacity-10 animate-blob-1 will-change-transform"
           style={{
