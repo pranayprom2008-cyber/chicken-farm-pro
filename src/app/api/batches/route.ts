@@ -5,28 +5,33 @@ import { cloudDb } from '@/lib/cloudStore';
 export const dynamic = 'force-dynamic';
 
 // GET all batches
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    // 1. Try Cloud Database first
+    // 1. Cloud Database is Single Source of Truth
     const cloudBatches = await cloudDb.get<any[]>('batches');
-    if (Array.isArray(cloudBatches) && cloudBatches.length > 0) {
+    if (cloudBatches !== null && Array.isArray(cloudBatches)) {
       return NextResponse.json(cloudBatches);
     }
 
-    // 2. Fallback to Prisma
-    const batches = await prisma.batch.findMany({
-      include: {
-        dailyRecords: { orderBy: { date: 'asc' } },
-        expenses: true,
-        salesRecords: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return NextResponse.json(batches || []);
+    // 2. First-time initialization only (when key is totally uninitialized)
+    try {
+      const batches = await prisma.batch.findMany({
+        include: {
+          dailyRecords: { orderBy: { date: 'asc' } },
+          expenses: true,
+          salesRecords: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      });
+      const initialList = Array.isArray(batches) ? batches : [];
+      await cloudDb.saveBatches(initialList);
+      return NextResponse.json(initialList);
+    } catch {
+      await cloudDb.saveBatches([]);
+      return NextResponse.json([]);
+    }
   } catch (error: any) {
-    console.error('Batches GET Error:', error);
-    return NextResponse.json([], { status: 200 });
+    return NextResponse.json([]);
   }
 }
 
@@ -94,7 +99,7 @@ export async function POST(req: Request) {
     const updatedBatches = [newBatch, ...currentBatches.filter((b) => b.id !== newBatch.id && b.batchNumber !== newBatch.batchNumber)];
     await cloudDb.saveBatches(updatedBatches);
 
-    // 2. Also attempt Prisma write in background
+    // 2. Background Prisma write
     try {
       await prisma.batch.create({
         data: {
@@ -113,7 +118,7 @@ export async function POST(req: Request) {
         },
       });
     } catch {
-      // Ephemeral fallback
+      // ignore
     }
 
     return NextResponse.json(newBatch, { status: 201 });

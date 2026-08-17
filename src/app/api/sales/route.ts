@@ -4,19 +4,25 @@ import { cloudDb } from '@/lib/cloudStore';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const cloudSales = await cloudDb.get<any[]>('sales');
-    if (Array.isArray(cloudSales) && cloudSales.length > 0) {
+    if (cloudSales !== null && Array.isArray(cloudSales)) {
       return NextResponse.json(cloudSales);
     }
 
-    const sales = await prisma.sales.findMany({
-      include: { batch: true },
-      orderBy: { saleDate: 'desc' },
-    });
-
-    return NextResponse.json(sales || []);
+    try {
+      const sales = await prisma.sales.findMany({
+        include: { batch: true },
+        orderBy: { saleDate: 'desc' },
+      });
+      const initialList = Array.isArray(sales) ? sales : [];
+      await cloudDb.saveSales(initialList);
+      return NextResponse.json(initialList);
+    } catch {
+      await cloudDb.saveSales([]);
+      return NextResponse.json([]);
+    }
   } catch (error: any) {
     return NextResponse.json([]);
   }
@@ -33,7 +39,7 @@ export async function POST(req: Request) {
     const calculatedRevenue = Number(totalRevenue) > 0 ? Number(totalRevenue) : sold * avgW * rate;
 
     const newSale = {
-      id: body.id || `SALE-${Date.now()}`,
+      id: body.id || `SALE-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       batchId: batchId || null,
       chickensSold: sold,
       averageWeight: avgW,
@@ -64,7 +70,7 @@ export async function POST(req: Request) {
         },
       });
     } catch {
-      // Ephemeral fallback
+      // ignore
     }
 
     return NextResponse.json(newSale, { status: 201 });

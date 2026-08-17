@@ -4,23 +4,28 @@ import { cloudDb } from '@/lib/cloudStore';
 
 export const dynamic = 'force-dynamic';
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
-    // 1. Try Cloud Database
+    // 1. Cloud Database is Single Source of Truth
     const cloudExpenses = await cloudDb.get<any[]>('expenses');
-    if (Array.isArray(cloudExpenses) && cloudExpenses.length > 0) {
+    if (cloudExpenses !== null && Array.isArray(cloudExpenses)) {
       return NextResponse.json(cloudExpenses);
     }
 
-    // 2. Fallback to Prisma
-    const expenses = await prisma.expense.findMany({
-      include: { batch: true },
-      orderBy: { date: 'desc' },
-    });
-
-    return NextResponse.json(expenses || []);
+    // 2. First-time initialization only (when key is totally uninitialized)
+    try {
+      const expenses = await prisma.expense.findMany({
+        include: { batch: true },
+        orderBy: { date: 'desc' },
+      });
+      const initialList = Array.isArray(expenses) ? expenses : [];
+      await cloudDb.saveExpenses(initialList);
+      return NextResponse.json(initialList);
+    } catch {
+      await cloudDb.saveExpenses([]);
+      return NextResponse.json([]);
+    }
   } catch (error: any) {
-    console.error('Expenses GET Error:', error);
     return NextResponse.json([]);
   }
 }
@@ -38,7 +43,7 @@ export async function POST(req: Request) {
     }
 
     const newExpense = {
-      id: body.id || `EXP-${Date.now()}`,
+      id: body.id || `EXP-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       category: category || 'Other',
       amount: Number(amount),
       description: description || `Expense for ${category}`,
@@ -52,7 +57,7 @@ export async function POST(req: Request) {
     const updatedExpenses = [newExpense, ...currentExpenses.filter((e) => e.id !== newExpense.id)];
     await cloudDb.saveExpenses(updatedExpenses);
 
-    // 2. Also try Prisma in background
+    // 2. Background Prisma write
     try {
       await prisma.expense.create({
         data: {
@@ -65,7 +70,7 @@ export async function POST(req: Request) {
         },
       });
     } catch {
-      // Ephemeral fallback
+      // ignore
     }
 
     return NextResponse.json(newExpense, { status: 201 });

@@ -418,39 +418,30 @@ export const useFarmStore = create<FarmState>()(
         set({ stats: newStats });
       },
 
-      // Universal Cloud Sync across all laptops & devices
+      // Universal Authoritative Cloud Sync across all laptops & devices
       syncAll: async () => {
         try {
           const res = await fetch('/api/sync', { cache: 'no-store' });
           if (res.ok) {
             const cloudData = await res.json();
-            if (cloudData) {
-              set((s) => ({
-                batches: Array.isArray(cloudData.batches) ? cloudData.batches : s.batches,
-                expenses: Array.isArray(cloudData.expenses) ? cloudData.expenses : s.expenses,
-                sales: Array.isArray(cloudData.sales) ? cloudData.sales : s.sales,
-                billingHistory: Array.isArray(cloudData.billingHistory) ? cloudData.billingHistory : s.billingHistory,
-                notifications: Array.isArray(cloudData.notifications) ? cloudData.notifications : s.notifications,
-                settings: cloudData.settings ? { ...s.settings, ...cloudData.settings } : s.settings,
+            if (cloudData && typeof cloudData === 'object') {
+              set({
+                batches: Array.isArray(cloudData.batches) ? cloudData.batches : [],
+                expenses: Array.isArray(cloudData.expenses) ? cloudData.expenses : [],
+                sales: Array.isArray(cloudData.sales) ? cloudData.sales : [],
+                billingHistory: Array.isArray(cloudData.billingHistory) ? cloudData.billingHistory : [],
+                notifications: Array.isArray(cloudData.notifications) ? cloudData.notifications : [],
+                settings: cloudData.settings ? { ...get().settings, ...cloudData.settings } : get().settings,
                 lastSyncedAt: new Date().toISOString(),
-              }));
+              });
               get().recalculateStats();
               return;
             }
           }
         } catch (e) {
-          console.warn('Sync fallback:', e);
+          console.warn('Sync error:', e);
         }
-
-        await Promise.allSettled([
-          get().fetchBatches(),
-          get().fetchExpenses(),
-          get().fetchBillingHistory(),
-          get().fetchSales(),
-          get().fetchNotifications(),
-        ]);
         get().recalculateStats();
-        set({ lastSyncedAt: new Date().toISOString() });
       },
 
       fetchDashboardData: async () => {
@@ -1071,7 +1062,20 @@ export const useFarmStore = create<FarmState>()(
         }
 
         try {
-          await fetch('/api/reset', { method: 'POST' });
+          await Promise.allSettled([
+            fetch('/api/reset', { method: 'POST' }),
+            fetch('/api/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                batches: [],
+                expenses: [],
+                sales: [],
+                billingHistory: [],
+                notifications: [],
+              }),
+            }),
+          ]);
         } catch (e) {
           console.error(e);
         }
