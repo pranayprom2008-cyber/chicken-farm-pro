@@ -62,10 +62,11 @@ export interface AIActionHistoryItem {
 
 export interface ActionProposal {
   type:
+    | 'create_batch'
+    | 'update_batch'
     | 'create_expense'
     | 'update_expense'
     | 'delete_expense'
-    | 'update_batch'
     | 'add_mortality'
     | 'create_sale'
     | 'create_task'
@@ -73,13 +74,17 @@ export interface ActionProposal {
     | 'create_feed_purchase';
   title: string;
   details: {
+    batchNumber?: string;
+    batchName?: string;
+    batchId?: string;
+    totalChicks?: number;
+    breedType?: string;
+    durationDays?: number;
     expenseId?: string;
     category?: string;
     amount?: number;
     oldAmount?: number;
     newAmount?: number;
-    batchNumber?: string;
-    batchId?: string;
     description?: string;
     date?: string;
     deadChicks?: number;
@@ -95,6 +100,7 @@ export interface ActionProposal {
     purchaseQuantityKg?: number;
     filterKey?: string;
     filterValue?: any;
+    transactionId?: string;
     [key: string]: any;
   };
   status: 'pending' | 'confirmed' | 'cancelled';
@@ -245,6 +251,26 @@ export type UserIntent =
   | 'SIMULATION_QUERY'
   | 'UNKNOWN';
 
+export interface VoiceSessionMemory {
+  currentFarmId?: string;
+  currentBatch?: string; // e.g. "Batch 12"
+  currentBatchId?: string;
+  currentCategory?: string; // e.g. "Feed", "Medicine"
+  lastCreatedRecord?: {
+    type: 'batch' | 'expense' | 'mortality' | 'feed' | 'sale' | 'task';
+    id: string;
+    amount?: number;
+    batchNumber?: string;
+    category?: string;
+    count?: number;
+  };
+  lastMentionedAmount?: number;
+  lastMentionedItem?: string;
+  lastMentionedCount?: number;
+  lastAction?: string;
+  lastTransactionId?: string;
+}
+
 export interface ConversationContext {
   state: ConversationState;
   lastIntent?: UserIntent;
@@ -255,6 +281,7 @@ export interface ConversationContext {
   interruptedMessage?: string | null;
   lastAssistantResponse?: string | null;
   speedAdjustment?: number;
+  sessionMemory?: VoiceSessionMemory;
 }
 
 export interface ConversationProcessResult {
@@ -268,4 +295,5 @@ export interface ConversationProcessResult {
   speedAdjustment?: number;
   lastBatchId?: string | null;
   handledDirectly?: boolean;
+  sessionMemory?: VoiceSessionMemory;
 }

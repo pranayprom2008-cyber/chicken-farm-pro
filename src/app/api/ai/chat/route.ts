@@ -91,6 +91,7 @@ export async function POST(req: NextRequest) {
       intent: result.intent,
       pendingAction: result.pendingAction,
       lastBatchId: result.lastBatchId,
+      sessionMemory: result.sessionMemory,
       stopAudio: result.stopAudio,
       resumeAudioText: result.resumeAudioText,
       speedAdjustment: result.speedAdjustment,

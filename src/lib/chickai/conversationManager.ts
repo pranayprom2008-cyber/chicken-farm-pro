@@ -9,7 +9,8 @@ import {
   ConversationProcessResult,
   FarmContextSnapshot,
   ChickAIMessage,
-  ActionProposal
+  ActionProposal,
+  VoiceSessionMemory
 } from './types';
 import { ChickAIEngine } from './engine';
 
@@ -97,11 +98,12 @@ export class ChickAIConversationManager {
       return 'SPEED_UP';
     }
 
-    // 6. Check for Confirmation / Approval
+    // 6. Direct confirmation / save triggers
     const confirmPhrases = [
-      'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'okay', 'ok',
-      'proceed', 'sure', 'save', 'please do', 'yes please', 'yes save it', 'yes do it',
-      'affirmative', 'correct', 'that is correct', 'right', 'all good', 'looks good'
+      'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'save that', 'save this',
+      'save there', 'save it there', 'save this information', 'okay', 'ok', 'proceed', 'sure',
+      'save', 'please do', 'yes please', 'yes save it', 'yes do it', 'affirmative', 'correct',
+      'that is correct', 'right', 'all good', 'looks good', 'record it', 'store it'
     ];
 
     if (context.pendingAction || context.state === 'WAITING_FOR_CONFIRMATION') {
@@ -125,8 +127,10 @@ export class ChickAIConversationManager {
         q.includes('make it') ||
         q.includes('make that') ||
         q.includes('change to') ||
+        q.includes('change that') ||
         q.includes('change amount') ||
         q.includes('instead') ||
+        q.includes('add another') ||
         q.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})*|\d+)/) ||
         q.includes('batch')
       ) {
@@ -134,12 +138,12 @@ export class ChickAIConversationManager {
       }
     }
 
-    // 7. Check for Slot filling when waiting for information
+    // 7. Slot filling when waiting for category
     if (context.state === 'WAITING_FOR_INFORMATION' && context.waitingForField) {
       return 'CORRECT';
     }
 
-    // 8. General conversational queries
+    // 8. General conversational greetings
     const greetings = ['hello', 'hi', 'hey', 'good morning', 'good afternoon', 'good evening', 'how are you', 'thank you', 'thanks', 'are you there', 'who are you', 'what can you do', 'help'];
     if (greetings.some((g) => q === g || q.startsWith(`${g} chickai`) || q.startsWith(`${g} assistant`))) {
       return 'GENERAL_CONVERSATION';
@@ -154,7 +158,10 @@ export class ChickAIConversationManager {
       q.includes('spent') ||
       q.includes('delete') ||
       q.includes('change') ||
-      q.includes('update')
+      q.includes('update') ||
+      q.includes('save') ||
+      q.includes('put this') ||
+      q.includes('remember')
     ) {
       return 'DATABASE_ACTION';
     }
@@ -163,7 +170,7 @@ export class ChickAIConversationManager {
   }
 
   /**
-   * Process a conversational turn with full state machine transitions
+   * Process a conversational turn with full state machine transitions and session memory
    */
   public process(
     rawQuery: string,
@@ -172,7 +179,37 @@ export class ChickAIConversationManager {
   ): ConversationProcessResult {
     const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     const cleanQuery = rawQuery.trim();
+    const q = cleanQuery.toLowerCase();
     const intent = this.classifyIntent(cleanQuery, context);
+
+    const memory: VoiceSessionMemory = { ...(context.sessionMemory || {}) };
+
+    // Extract any batch references from query to keep session memory fresh
+    const batchNumMatch = cleanQuery.match(/\b(?:batch\s*#?|b-?)(\d+)\b/i);
+    if (batchNumMatch && batchNumMatch[1]) {
+      const targetBNum = `Batch ${batchNumMatch[1]}`;
+      const foundBatch = this.farmSnapshot.batches.find((b) => b.batchNumber.toLowerCase().includes(batchNumMatch[1]));
+      memory.currentBatch = foundBatch ? foundBatch.batchNumber : targetBNum;
+      memory.currentBatchId = foundBatch ? foundBatch.id : undefined;
+    }
+
+    // Extract category if mentioned
+    const cats = ['Feed', 'Medicine', 'Electricity', 'Labour', 'Maintenance', 'Transportation', 'Chicks', 'Other'];
+    for (const cat of cats) {
+      if (q.includes(cat.toLowerCase())) {
+        memory.currentCategory = cat;
+        break;
+      }
+    }
+
+    // Extract amounts if mentioned
+    const amtMatch = cleanQuery.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})+|\d+)/i);
+    if (amtMatch && amtMatch[1]) {
+      const amtVal = parseFloat(amtMatch[1].replace(/,/g, ''));
+      if (!isNaN(amtVal) && amtVal > 0) {
+        memory.lastMentionedAmount = amtVal;
+      }
+    }
 
     // ====================================================
     // 1. INTENT: STOP_SPEAKING
@@ -191,6 +228,7 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
@@ -211,6 +249,7 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
@@ -237,6 +276,7 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
@@ -263,6 +303,7 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
@@ -283,6 +324,7 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
     if (intent === 'SPEED_UP') {
@@ -299,57 +341,53 @@ export class ChickAIConversationManager {
         pendingAction: context.pendingAction,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
     // ====================================================
-    // 6. INTENT: CONFIRM (Execute Pending Action)
+    // 6. INTENT: CONFIRM / SAVE ("Save that", "Save it", "Save there")
     // ====================================================
-    if (intent === 'CONFIRM' && context.pendingAction) {
-      const proposal = context.pendingAction;
-      let text = '✅ *Confirmed and saved to your database.*';
+    if (
+      (intent === 'CONFIRM' || q.includes('save that') || q.includes('save it') || q.includes('save this') || q.includes('save there')) &&
+      context.pendingAction
+    ) {
+      const proposal = { ...context.pendingAction };
+      proposal.status = 'confirmed';
+      const targetB = proposal.details.batchNumber || memory.currentBatch || 'Batch 12';
 
+      let shortConf = `Saved to ${targetB}.`;
       if (proposal.type === 'create_expense') {
-        const { amount, category, batchNumber } = proposal.details;
-        text = `Done! I've recorded the **₹ ${amount?.toLocaleString('en-IN')}** ${category} expense for **${batchNumber || 'General Farm'}** to your database.`;
-      } else if (proposal.type === 'update_expense') {
-        const { newAmount, category } = proposal.details;
-        text = `Done! The ${category} expense has been updated to **₹ ${newAmount?.toLocaleString('en-IN')}**.`;
-      } else if (proposal.type === 'delete_expense') {
-        const { amount, category } = proposal.details;
-        text = `Done! Removed the **₹ ${amount?.toLocaleString('en-IN')}** (${category}) expense from your records.`;
+        shortConf = `Added ₹${(proposal.details.amount || 0).toLocaleString('en-IN')} ${proposal.details.category || 'Expense'}.`;
+      } else if (proposal.type === 'create_batch') {
+        shortConf = `Created ${proposal.details.batchNumber || 'New Batch'} with ${(proposal.details.totalChicks || 5000).toLocaleString()} chicks.`;
       } else if (proposal.type === 'add_mortality') {
-        const { deadChicks, feedConsumed, averageWeight, batchNumber } = proposal.details;
-        if (averageWeight && averageWeight > 0) {
-          text = `Done! Logged **${averageWeight} kg** average bird weight telemetry for **${batchNumber}**.`;
-        } else if (deadChicks && deadChicks > 0) {
-          text = `Done! Recorded **${deadChicks} mortality** for **${batchNumber}**.`;
-        } else {
-          text = `Done! Recorded **${feedConsumed} kg feed consumption** for **${batchNumber}**.`;
-        }
-      } else if (proposal.type === 'create_sale') {
-        const { chickensSold, totalRevenue } = proposal.details;
-        text = `Done! Recorded commercial sale of **${chickensSold} birds** (Total: ₹ ${(totalRevenue || 0).toLocaleString('en-IN')}).`;
-      } else if (proposal.type === 'create_task') {
-        text = `Done! Scheduled task **"${proposal.details.taskTitle}"** on your farm agenda.`;
+        shortConf = `Mortality recorded for ${targetB}.`;
       }
 
       return {
         message: {
           id: `act-${Date.now()}`,
           sender: 'assistant',
-          text,
+          text: `✅ **${shortConf}**`,
           timestamp: timeStr,
-          actionProposal: {
-            ...proposal,
-            status: 'confirmed',
-          },
+          actionProposal: proposal,
         },
         nextState: 'ACTION_COMPLETED',
         intent: 'CONFIRM',
         pendingAction: null,
         lastBatchId: proposal.details.batchId || context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: {
+          ...memory,
+          lastCreatedRecord: {
+            type: proposal.type === 'create_batch' ? 'batch' : proposal.type === 'create_expense' ? 'expense' : 'mortality',
+            id: proposal.details.batchId || `rec-${Date.now()}`,
+            amount: proposal.details.amount,
+            batchNumber: targetB,
+            category: proposal.details.category,
+          },
+        },
       };
     }
 
@@ -361,7 +399,7 @@ export class ChickAIConversationManager {
         message: {
           id: `cancel-${Date.now()}`,
           sender: 'assistant',
-          text: '↩️ *Okay, I\'ve cancelled that.* No changes were made to your farm database.',
+          text: '↩️ *Okay, cancelled.* No changes were made to your farm database.',
           timestamp: timeStr,
         },
         nextState: 'CANCELLED',
@@ -370,65 +408,60 @@ export class ChickAIConversationManager {
         waitingForField: null,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
     // ====================================================
-    // 8. INTENT: CHANGE_REQUEST / CORRECTION
+    // 8. INTENT: CHANGE_REQUEST / CORRECTION / ADD ANOTHER
     // ====================================================
-    if (intent === 'CHANGE_REQUEST' && context.pendingAction) {
-      const q = cleanQuery.toLowerCase();
-      const proposal = { ...context.pendingAction };
-      const details = { ...proposal.details };
+    if (
+      (intent === 'CHANGE_REQUEST' || q.includes('change that to') || q.includes('change to') || q.includes('add another')) &&
+      (context.pendingAction || memory.lastCreatedRecord || memory.lastMentionedAmount)
+    ) {
+      let targetAmt = memory.lastMentionedAmount || 1000;
+      const numMatch = cleanQuery.match(/(\d{1,3}(?:,\d{3})+|\d+)/);
 
-      // Check for amount correction (e.g. "Actually make that 1500", "Make it 2000 instead")
-      const amtMatch = cleanQuery.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})+|\d+)/i);
-      if (amtMatch && amtMatch[1]) {
-        const newAmt = parseFloat(amtMatch[1].replace(/,/g, ''));
-        if (!isNaN(newAmt) && newAmt > 0) {
-          details.amount = newAmt;
-          proposal.title = `Save ₹${newAmt.toLocaleString('en-IN')} ${details.category || 'Expense'}`;
-        }
+      if (q.includes('add another') && numMatch) {
+        const extra = parseFloat(numMatch[1].replace(/,/g, ''));
+        targetAmt += extra;
+      } else if (numMatch) {
+        targetAmt = parseFloat(numMatch[1].replace(/,/g, ''));
       }
 
-      // Check for batch correction (e.g. "Actually make it Batch 44", "No, Batch 43")
-      const batchNumMatch = cleanQuery.match(/\b(?:batch\s*#?|b-?)(\d+)\b/i);
-      if (batchNumMatch && batchNumMatch[1]) {
-        const targetBNum = `Batch-${batchNumMatch[1]}`;
-        const foundBatch = this.farmSnapshot.batches.find((b) => b.batchNumber.toLowerCase().includes(batchNumMatch[1]));
-        if (foundBatch) {
-          details.batchId = foundBatch.id;
-          details.batchNumber = foundBatch.batchNumber;
-        } else {
-          details.batchNumber = targetBNum;
-        }
-      }
+      const cat = memory.currentCategory || 'Expense';
+      const batchNum = memory.currentBatch || 'Batch 12';
 
-      // Check for category correction
-      const cats = ['Feed', 'Medicine', 'Electricity', 'Labour', 'Maintenance', 'Transportation', 'Chicks', 'Other'];
-      for (const cat of cats) {
-        if (q.includes(cat.toLowerCase())) {
-          details.category = cat;
-          proposal.title = `Save ₹${(details.amount || 0).toLocaleString('en-IN')} ${cat} Expense`;
-          break;
-        }
-      }
-
-      proposal.details = details;
+      const updatedProposal: ActionProposal = {
+        type: 'create_expense',
+        title: `Save ₹${targetAmt.toLocaleString('en-IN')} ${cat}`,
+        details: {
+          category: cat,
+          amount: targetAmt,
+          batchNumber: batchNum,
+          description: `ChickAI updated: ${cat} expense`,
+          date: new Date().toISOString().split('T')[0],
+        },
+        status: 'pending',
+      };
 
       return {
         message: {
           id: `mod-${Date.now()}`,
           sender: 'assistant',
-          text: `Got it! I've updated the proposal:\n\n• **Amount:** ₹ ${(details.amount || 0).toLocaleString('en-IN')}\n• **Category:** ${details.category || 'Expense'}\n• **Target:** ${details.batchNumber || 'General Farm'}\n\nShould I save this to your database?`,
+          text: `Updated to **₹ ${targetAmt.toLocaleString('en-IN')} ${cat}** for **${batchNum}**.\n\nSave this?`,
           timestamp: timeStr,
-          actionProposal: proposal,
+          actionProposal: updatedProposal,
         },
         nextState: 'WAITING_FOR_CONFIRMATION',
         intent: 'CHANGE_REQUEST',
-        pendingAction: proposal,
-        lastBatchId: details.batchId || context.lastBatchId,
+        pendingAction: updatedProposal,
+        lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: {
+          ...memory,
+          lastMentionedAmount: targetAmt,
+        },
       };
     }
 
@@ -436,7 +469,6 @@ export class ChickAIConversationManager {
     // 9. INTENT: MISSING INFORMATION (Slot Filling)
     // ====================================================
     if (context.state === 'WAITING_FOR_INFORMATION' && context.waitingForField === 'category') {
-      const q = cleanQuery.toLowerCase();
       let selectedCat = 'Other';
       if (q.includes('feed')) selectedCat = 'Feed';
       else if (q.includes('med') || q.includes('vacc')) selectedCat = 'Medicine';
@@ -445,8 +477,8 @@ export class ChickAIConversationManager {
       else if (q.includes('maint') || q.includes('repair') || q.includes('husk')) selectedCat = 'Maintenance';
       else if (q.includes('diesel') || q.includes('fuel') || q.includes('trans')) selectedCat = 'Transportation';
 
-      const amount = context.pendingAction?.details?.amount || 1000;
-      const targetBatch = context.pendingAction?.details?.batchNumber || 'General Farm';
+      const amount = context.pendingAction?.details?.amount || memory.lastMentionedAmount || 1000;
+      const targetBatch = context.pendingAction?.details?.batchNumber || memory.currentBatch || 'General Farm';
 
       const newProposal: ActionProposal = {
         type: 'create_expense',
@@ -465,7 +497,7 @@ export class ChickAIConversationManager {
         message: {
           id: `fill-${Date.now()}`,
           sender: 'assistant',
-          text: `I'll add **₹ ${amount.toLocaleString('en-IN')}** as a **${selectedCat}** expense for **${targetBatch}**.\n\nShould I save this to your database?`,
+          text: `Got it! Recorded **₹ ${amount.toLocaleString('en-IN')} ${selectedCat}** for **${targetBatch}**.\n\nSave this to database?`,
           timestamp: timeStr,
           actionProposal: newProposal,
         },
@@ -475,6 +507,11 @@ export class ChickAIConversationManager {
         waitingForField: null,
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: {
+          ...memory,
+          currentCategory: selectedCat,
+          lastMentionedAmount: amount,
+        },
       };
     }
 
@@ -482,7 +519,6 @@ export class ChickAIConversationManager {
     // 10. INTENT: GENERAL CONVERSATION
     // ====================================================
     if (intent === 'GENERAL_CONVERSATION') {
-      const q = cleanQuery.toLowerCase();
       let responseText = 'Hello! I am ChickAI, your friendly farm copilot. How can I help with your poultry operations today?';
 
       if (q.includes('good morning')) {
@@ -510,20 +546,20 @@ export class ChickAIConversationManager {
         intent: 'GENERAL_CONVERSATION',
         lastBatchId: context.lastBatchId,
         handledDirectly: true,
+        sessionMemory: memory,
       };
     }
 
     // ====================================================
     // 11. INTENT: FARM_QUERY / DATABASE_ACTION (Deep Domain Engine)
     // ====================================================
-    // Resolve Pronouns: If user says "What about its expenses?" or "How is it doing?"
     let enrichedQuery = cleanQuery;
-    if (context.lastBatchId) {
-      const bObj = this.farmSnapshot.batches.find((b) => b.id === context.lastBatchId || b.batchNumber === context.lastBatchId);
-      if (bObj && (cleanQuery.includes('its') || cleanQuery.includes('it ') || cleanQuery.includes('this batch') || cleanQuery.includes('that batch'))) {
-        enrichedQuery = cleanQuery.replace(/\b(?:its|it|this batch|that batch)\b/gi, bObj.batchNumber);
+    if (context.lastBatchId || memory.currentBatch) {
+      const activeB = memory.currentBatch || context.lastBatchId;
+      if (q.includes('its') || q.includes('it ') || q.includes('this batch') || q.includes('that batch') || q.includes('same batch')) {
+        enrichedQuery = cleanQuery.replace(/\b(?:its|it|this batch|that batch|same batch)\b/gi, activeB!);
       }
-      this.engine.setLastBatch(context.lastBatchId);
+      this.engine.setLastBatch(memory.currentBatchId || context.lastBatchId!);
     }
 
     const engineMsg = this.engine.processQuery(enrichedQuery, history);
@@ -538,7 +574,6 @@ export class ChickAIConversationManager {
     } else if (engineMsg.clarificationOptions) {
       nextState = 'WAITING_FOR_INFORMATION';
       waitingForField = engineMsg.clarificationOptions.field;
-      // Stash partial proposal
       const amtMatch = cleanQuery.match(/(?:₹|rs\.?|inr)?\s*(\d{1,3}(?:,\d{3})+|\d+)/i);
       if (amtMatch) {
         pendingAction = {
@@ -560,6 +595,7 @@ export class ChickAIConversationManager {
       waitingForField,
       lastBatchId: this.engine.getLastBatch() || context.lastBatchId,
       handledDirectly: false,
+      sessionMemory: memory,
     };
   }
 }

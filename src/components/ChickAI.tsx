@@ -57,7 +57,8 @@ import {
   ActionProposal,
   ConversationState,
   ConversationContext,
-  UserIntent
+  UserIntent,
+  VoiceSessionMemory
 } from '@/lib/chickai/types';
 import { ChickAIEngine } from '@/lib/chickai/engine';
 import { ChickAIVoiceService, VoiceSettings, DEFAULT_VOICE_SETTINGS } from '@/lib/chickai/voice';
@@ -73,14 +74,18 @@ export default function ChickAI() {
 
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
-  const [showHistoryView, setShowHistoryView] = useState(false);
-  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
   const [activeVoiceMode, setActiveVoiceMode] = useState(false);
+  const [showVoiceSettings, setShowVoiceSettings] = useState(false);
+  const [showHistoryView, setShowHistoryView] = useState(false);
+  const [showWeeklyModal, setShowWeeklyModal] = useState(false);
+  const [weeklyReportData, setWeeklyReportData] = useState<any>(null);
+
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [activeBatchId, setActiveBatchId] = useState<string | null>(null);
   const [actionHistory, setActionHistory] = useState<AIActionHistoryItem[]>([]);
+  const [sessionMemory, setSessionMemory] = useState<VoiceSessionMemory>({});
+  const executedTxRef = useRef<Set<string>>(new Set());
 
   // Conversational State Machine
   const [conversationState, setConversationState] = useState<ConversationState>('IDLE');
@@ -336,9 +341,42 @@ export default function ChickAI() {
     let confirmationText = '';
     let spokenConfirmation = '';
 
+    // Deduplication check to prevent double writes on duplicate voice recognition events
+    const txKey = proposal.details.transactionId || `${proposal.type}-${proposal.details.amount || proposal.details.totalChicks || proposal.details.deadChicks || ''}-${proposal.details.category || proposal.details.batchNumber || ''}-${Math.floor(Date.now() / 4000)}`;
+    if (executedTxRef.current.has(txKey)) {
+      setConversationState('IDLE');
+      return;
+    }
+    executedTxRef.current.add(txKey);
+
     try {
+      // 0. Create Batch
+      if (proposal.type === 'create_batch') {
+        const { batchNumber, totalChicks, breedType, durationDays } = proposal.details;
+        await store.createBatch({
+          batchNumber: batchNumber || `Batch-${Date.now().toString().slice(-4)}`,
+          batchName: batchNumber || 'New Batch',
+          totalChicks: totalChicks || 5000,
+          breedType: breedType || 'Cobb 500 (Broiler)',
+          durationDays: durationDays || 45,
+          status: 'growing',
+        });
+
+        confirmationText = `✅ **Batch Created!** Saved **${batchNumber}** with **${(totalChicks || 5000).toLocaleString()} birds** directly to your farm database.`;
+        spokenConfirmation = `Done! Created ${batchNumber} with ${(totalChicks || 5000).toLocaleString()} chicks.`;
+
+        setActionHistory((prev) => [
+          {
+            id: `act-${Date.now()}`,
+            action: `Created ${batchNumber} (${(totalChicks || 5000).toLocaleString()} Birds)`,
+            target: batchNumber || 'New Flock',
+            amount: totalChicks,
+            timestamp: actionTime,
+          },
+        ]);
+      }
       // 1. Create Expense
-      if (proposal.type === 'create_expense') {
+      else if (proposal.type === 'create_expense') {
         const { category, amount, batchId, description, batchNumber } = proposal.details;
         await store.createExpense({
           category: category || 'Other',
@@ -349,8 +387,8 @@ export default function ChickAI() {
         });
 
         const createdId = `EXP-${Date.now().toString().slice(-4)}`;
-        confirmationText = `✅ **Expense Added Successfully!**\n\n• **Amount:** ₹ ${amount?.toLocaleString('en-IN')}\n• **Category:** ${category}\n• **Batch:** ${batchNumber || 'General Farm'}\n• **Date:** Today\n• **Expense ID:** #${createdId}\n\n*All dashboard financials and batch totals have been updated live.*`;
-        spokenConfirmation = `Done! I've added the ${amount} rupee ${category} expense for ${batchNumber || 'your farm'}.`;
+        confirmationText = `✅ **Expense Saved to Database!**\n\n• **Amount:** ₹ ${amount?.toLocaleString('en-IN')}\n• **Category:** ${category}\n• **Batch:** ${batchNumber || 'General Farm'}\n• **Expense ID:** #${createdId}`;
+        spokenConfirmation = `Done! Added ₹${amount?.toLocaleString('en-IN')} ${category} expense to ${batchNumber || 'your farm'}.`;
 
         setActionHistory((prev) => [
           {
@@ -371,7 +409,7 @@ export default function ChickAI() {
             description: `${description || category} (Updated by ChickAI)`,
           });
         }
-        confirmationText = `✅ **Expense Modified Successfully!**\n\n• **Category:** ${category}\n• **Previous Amount:** ₹ ${oldAmount?.toLocaleString('en-IN')}\n• **Updated Amount:** **₹ ${newAmount?.toLocaleString('en-IN')}**\n\n*Recalculated all batch expenditures and dashboard charts.*`;
+        confirmationText = `✅ **Expense Updated!** ${category} expense changed to **₹ ${newAmount?.toLocaleString('en-IN')}**.`;
         spokenConfirmation = `Done! The ${category} expense has been updated to ${newAmount} rupees.`;
 
         setActionHistory((prev) => [
@@ -390,7 +428,7 @@ export default function ChickAI() {
         if (expenseId) {
           await store.deleteExpense(expenseId);
         }
-        confirmationText = `🗑️ **Expense Deleted Successfully.** Removed ₹ ${amount?.toLocaleString('en-IN')} (${category}) from your records.`;
+        confirmationText = `🗑️ **Expense Deleted.** Removed ₹ ${amount?.toLocaleString('en-IN')} (${category}) from your records.`;
         spokenConfirmation = `Done! The ${amount} rupee ${category} expense has been deleted.`;
 
         setActionHistory((prev) => [
@@ -412,18 +450,18 @@ export default function ChickAI() {
             deadChicks: deadChicks || 0,
             feedConsumed: feedConsumed || 0,
             averageWeight: averageWeight || 0,
-            notes: 'Logged via ChickAI Farm Copilot',
+            notes: 'Logged via ChickAI Voice Copilot',
           });
         }
 
         if (averageWeight && averageWeight > 0) {
-          confirmationText = `✅ **Flock Weight Recorded!** Saved **${averageWeight} kg** average bird weight for **${batchNumber}**.`;
-          spokenConfirmation = `Done! I've logged ${averageWeight} kg average weight for ${batchNumber}.`;
+          confirmationText = `✅ **Flock Weight Recorded!** Saved **${averageWeight} kg** avg weight for **${batchNumber}**.`;
+          spokenConfirmation = `Done! Logged ${averageWeight} kg average weight for ${batchNumber}.`;
         } else if (deadChicks && deadChicks > 0) {
           confirmationText = `✅ **Mortality Updated!** Recorded **${deadChicks} dead birds** for **${batchNumber}**.`;
-          spokenConfirmation = `Done! I've updated the mortality record for ${batchNumber}.`;
+          spokenConfirmation = `Done! Mortality recorded for ${batchNumber}.`;
         } else {
-          confirmationText = `✅ **Feed Consumed Logged!** Recorded **${feedConsumed} kg feed usage** for **${batchNumber}**.`;
+          confirmationText = `✅ **Feed Consumed Logged!** Recorded **${feedConsumed} kg feed** for **${batchNumber}**.`;
           spokenConfirmation = `Done! Recorded ${feedConsumed} kilos feed usage for ${batchNumber}.`;
         }
 
@@ -439,14 +477,14 @@ export default function ChickAI() {
       // 5. Create Feed Purchase Task
       else if (proposal.type === 'create_feed_purchase') {
         const { purchaseQuantityKg, priority, batchNumber } = proposal.details;
-        confirmationText = `✅ **Feed Procurement Task Created!**\n\n• **Order Quantity:** **${(purchaseQuantityKg || 2000).toLocaleString()} kg** Broiler Feed (~${Math.round((purchaseQuantityKg || 2000) / 50)} bags)\n• **Assigned:** Warehouse & Logistics\n• **Priority:** ${priority?.toUpperCase() || 'HIGH'}\n\n*Added to your farm daily operations backlog.*`;
-        spokenConfirmation = `Done! I've created the feed procurement task for ${purchaseQuantityKg} kilograms.`;
+        confirmationText = `✅ **Feed Procurement Scheduled!** Added **${(purchaseQuantityKg || 2000).toLocaleString()} kg** Broiler Feed to operations.`;
+        spokenConfirmation = `Done! Created feed purchase task for ${purchaseQuantityKg} kilograms.`;
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
-            action: `Created Procurement: ${purchaseQuantityKg}kg Feed`,
-            target: batchNumber || 'Inventory Reserve',
+            action: `Procurement: ${purchaseQuantityKg}kg Feed`,
+            target: batchNumber || 'Inventory',
             timestamp: actionTime,
           },
         ]);
@@ -462,8 +500,8 @@ export default function ChickAI() {
           pricePerKg: pricePerKg || 115,
           saleDate: new Date().toISOString().split('T')[0],
         });
-        confirmationText = `✅ **Bird Sale Recorded!** Saved dispatch of **${chickensSold || 500} birds** at ₹${pricePerKg || 115}/kg (Total: ₹ ${(totalRevenue || 0).toLocaleString('en-IN')}).`;
-        spokenConfirmation = `Done! I've recorded the sale of ${chickensSold} birds for a total of ${(totalRevenue || 0)} rupees.`;
+        confirmationText = `✅ **Bird Sale Recorded!** Saved dispatch of **${chickensSold || 500} birds** (Total: ₹ ${(totalRevenue || 0).toLocaleString('en-IN')}).`;
+        spokenConfirmation = `Done! Recorded bird sale for ${(totalRevenue || 0)} rupees.`;
 
         setActionHistory((prev) => [
           {
@@ -478,18 +516,24 @@ export default function ChickAI() {
       // 7. Create Task
       else if (proposal.type === 'create_task') {
         const { taskTitle, priority, batchNumber } = proposal.details;
-        confirmationText = `✅ **Operational Task Scheduled!**\n\n• **Task:** ${taskTitle}\n• **Priority:** ${priority?.toUpperCase()}\n• **Target:** ${batchNumber}\n\n*Added to your farm daily agenda.*`;
-        spokenConfirmation = `Done! I've scheduled the task to ${taskTitle}.`;
+        confirmationText = `✅ **Task Scheduled!** "${taskTitle}" added to farm agenda.`;
+        spokenConfirmation = `Done! Scheduled task to ${taskTitle}.`;
 
         setActionHistory((prev) => [
           {
             id: `act-${Date.now()}`,
-            action: `Created Task: ${taskTitle}`,
-            target: batchNumber || 'General Farm',
+            action: `Task: ${taskTitle}`,
+            target: batchNumber || 'Farm Operations',
             timestamp: actionTime,
           },
         ]);
       }
+
+      // Revalidate database and recalculate live stats immediately across whole UI
+      await Promise.allSettled([
+        store.syncAll(),
+        store.fetchDashboardData(),
+      ]);
 
       setPendingAction(null);
       setConversationState('ACTION_COMPLETED');
@@ -515,9 +559,21 @@ export default function ChickAI() {
         });
       }
     } catch (err: any) {
-      console.error(err);
+      console.error('Database write error:', err);
       setConversationState('ERROR');
-      alert('Failed to execute action: ' + err.message);
+      const failText = "I couldn't save that because the database request failed. Please try again.";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `err-${Date.now()}`,
+          sender: 'assistant',
+          text: `⚠️ **Database Save Failed:** ${failText}`,
+          timestamp: actionTime,
+        },
+      ]);
+      if (voiceSettings.autoSpeak || activeVoiceMode || isVoice) {
+        voiceServiceRef.current.speak(failText, voiceSettings, () => setConversationState('SPEAKING'), () => setConversationState('IDLE'));
+      }
     }
   };
 
@@ -551,10 +607,11 @@ export default function ChickAI() {
       return;
     }
 
-    // Client Fast-Path: Confirmation (YES)
+    // Client Fast-Path: Confirmation (YES / Save that / Save it)
     const isYes = [
-      'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'okay', 'ok',
-      'proceed', 'sure', 'save', 'please do', 'yes please', 'yes save it', 'yes do it'
+      'yes', 'yeah', 'yep', 'do it', 'go ahead', 'confirm', 'save it', 'save that', 'save this',
+      'save there', 'save it there', 'save this information', 'okay', 'ok', 'proceed', 'sure',
+      'save', 'please do', 'yes please', 'yes save it', 'yes do it'
     ].some((p) => qLower === p || qLower.startsWith(`${p} `) || qLower.endsWith(` ${p}`));
 
     if (isYes && pendingAction) {
@@ -627,6 +684,7 @@ export default function ChickAI() {
         waitingForField,
         interruptedMessage,
         lastAssistantResponse,
+        sessionMemory,
       };
 
       const clientContext = {
@@ -657,6 +715,9 @@ export default function ChickAI() {
         if (data.lastBatchId) {
           setActiveBatchId(data.lastBatchId);
         }
+        if (data.sessionMemory) {
+          setSessionMemory(data.sessionMemory);
+        }
 
         setConversationState(data.nextState || 'IDLE');
         setPendingAction(data.pendingAction || null);
@@ -669,6 +730,12 @@ export default function ChickAI() {
         }
 
         setMessages((prev) => [...prev, data.message]);
+
+        // If the action was confirmed automatically (e.g. from "save that", "save it", "save there")
+        if (data.message.actionProposal && data.message.actionProposal.status === 'confirmed') {
+          await executeDatabaseAction(data.message.actionProposal, isVoiceInitiated);
+          return;
+        }
 
         // Auto-Speak
         if (voiceSettings.autoSpeak || activeVoiceMode || isVoiceInitiated) {

@@ -803,6 +803,36 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
   // ==========================================
   private checkActionProposal(query: string, batch: any | null, history: ChickAIMessage[] = []): any | null {
     const q = query.toLowerCase();
+    const effectiveBatch = batch || this.context.batches.find((b) => b.status === 'growing') || this.context.batches[0];
+
+    // 0. Create / Record Batch
+    if (
+      q.includes('create batch') ||
+      q.includes('add batch') ||
+      q.includes('new batch') ||
+      (q.includes('record') && (q.includes('chicks') || q.includes('birds')) && !q.includes('dead') && !q.includes('mortality'))
+    ) {
+      const countMatch = query.match(/(\d{1,3}(?:,\d{3})+|\d+)\s*(?:chicks|birds|doc|flock)?/i);
+      const bNumMatch = query.match(/\b(?:batch\s*#?|b-?)(\d+)\b/i);
+      const total = countMatch ? parseInt(countMatch[1].replace(/,/g, ''), 10) : 5000;
+      const bNum = bNumMatch ? `Batch ${bNumMatch[1]}` : `Batch ${this.context.batches.length + 1}`;
+
+      return {
+        text: `🐣 **Create Batch Proposal**\n\n• **Batch Number:** **${bNum}**\n• **Total Chicks:** **${total.toLocaleString()} birds**\n• **Breed:** Cobb 500 (Broiler)\n• **Cycle Duration:** 45 Days\n\nSave this batch to your database?`,
+        proposal: {
+          type: 'create_batch',
+          title: `Create ${bNum} with ${total.toLocaleString()} Chicks`,
+          details: {
+            batchNumber: bNum,
+            batchName: bNum,
+            totalChicks: total,
+            breedType: 'Cobb 500 (Broiler)',
+            durationDays: 45,
+          },
+          status: 'pending',
+        },
+      };
+    }
 
     // 1. Add Task Action
     if (q.includes('create a task') || q.includes('add task') || q.includes('remind me to') || q.includes('schedule task')) {
@@ -811,15 +841,15 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
       if (!taskTitle) taskTitle = 'Farm Inspection & Task';
 
       return {
-        text: `I prepared the operational task proposal:\n\n• **Task:** ${taskTitle}\n• **Priority:** ${isUrgent ? 'High' : 'Medium'}\n• **Target Flock:** ${batch ? batch.batchNumber : 'General Farm'}\n\nWould you like me to schedule this task?`,
+        text: `I prepared the operational task proposal:\n\n• **Task:** ${taskTitle}\n• **Priority:** ${isUrgent ? 'High' : 'Medium'}\n• **Target Flock:** ${effectiveBatch ? effectiveBatch.batchNumber : 'General Farm'}\n\nWould you like me to schedule this task?`,
         proposal: {
           type: 'create_task',
           title: `Schedule Task: ${taskTitle}`,
           details: {
             taskTitle,
             priority: isUrgent ? 'high' : 'medium',
-            batchId: batch ? batch.id : undefined,
-            batchNumber: batch ? batch.batchNumber : 'General Farm',
+            batchId: effectiveBatch ? effectiveBatch.id : undefined,
+            batchNumber: effectiveBatch ? effectiveBatch.batchNumber : 'General Farm',
           },
           status: 'pending',
         },
@@ -827,23 +857,24 @@ ${sim.assumptions.map((a) => `• ${a}`).join('\n')}
     }
 
     // 2. Add Mortality / Bird Count Action
-    if ((q.includes('dead') || q.includes('death') || q.includes('died') || q.includes('mortality')) && (q.includes('add') || q.includes('record') || q.includes('log'))) {
+    if ((q.includes('dead') || q.includes('death') || q.includes('died') || q.includes('mortality')) && (q.includes('add') || q.includes('record') || q.includes('log') || q.includes('update') || q.includes('save'))) {
       const countMatch = query.match(/(\d+)\s*(?:dead|birds|chicks|mortality|died)?/i);
       const count = countMatch ? parseInt(countMatch[1], 10) : null;
+      const targetB = batch || effectiveBatch;
 
-      if (count && count > 0 && batch) {
-        const currentAlive = batch.aliveChicks || 0;
-        const currentDead = batch.deadChicks || 0;
+      if (count && count > 0 && targetB) {
+        const currentAlive = targetB.aliveChicks || 0;
+        const currentDead = targetB.deadChicks || 0;
         const newAlive = Math.max(0, currentAlive - count);
 
         return {
-          text: `🐔 **Mortality Update Proposal**\n\n• **Batch:** ${batch.batchNumber}\n• **Deaths to Log:** **${count} birds**\n• **Alive Count:** ${currentAlive.toLocaleString()} $\\rightarrow$ **${newAlive.toLocaleString()}**\n\nAre you sure you want to record this mortality?`,
+          text: `🐔 **Mortality Update Proposal**\n\n• **Batch:** ${targetB.batchNumber}\n• **Deaths to Log:** **${count} birds**\n• **Alive Count:** ${currentAlive.toLocaleString()} $\\rightarrow$ **${newAlive.toLocaleString()}**\n\nSave this mortality to ${targetB.batchNumber}?`,
           proposal: {
             type: 'add_mortality',
-            title: `Log ${count} Mortality for ${batch.batchNumber}`,
+            title: `Log ${count} Mortality for ${targetB.batchNumber}`,
             details: {
-              batchId: batch.id,
-              batchNumber: batch.batchNumber,
+              batchId: targetB.id,
+              batchNumber: targetB.batchNumber,
               deadChicks: count,
               aliveChicks: newAlive,
             },
