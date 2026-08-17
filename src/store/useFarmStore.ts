@@ -663,9 +663,11 @@ export const useFarmStore = create<FarmState>()(
       },
 
       deleteBatch: async (id) => {
+        let updatedBatches: Batch[] = [];
+        let updatedExpenses: Expense[] = [];
         set((state) => {
-          const updatedBatches = state.batches.filter((b) => b.id !== id);
-          const updatedExpenses = state.expenses.filter((e) => e.batchId !== id);
+          updatedBatches = state.batches.filter((b) => b.id !== id);
+          updatedExpenses = state.expenses.filter((e) => e.batchId !== id);
           const updatedStats = computeStatsFromState(updatedBatches, updatedExpenses, state.sales);
           return {
             batches: updatedBatches,
@@ -675,7 +677,18 @@ export const useFarmStore = create<FarmState>()(
         });
 
         try {
-          fetch(`/api/batches/${id}`, { method: 'DELETE' });
+          await fetch(`/api/batches/${id}`, { method: 'DELETE' });
+          const curState = get();
+          await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              batches: curState.batches,
+              expenses: curState.expenses,
+              sales: curState.sales,
+              billingHistory: curState.billingHistory,
+            }),
+          });
         } catch {
           // ignore
         }
@@ -843,8 +856,9 @@ export const useFarmStore = create<FarmState>()(
       },
 
       deleteExpense: async (id) => {
+        let updatedExpenses: Expense[] = [];
         set((state) => {
-          const updatedExpenses = state.expenses.filter((e) => e.id !== id);
+          updatedExpenses = state.expenses.filter((e) => e.id !== id);
           const updatedStats = computeStatsFromState(state.batches, updatedExpenses, state.sales);
           return {
             expenses: updatedExpenses,
@@ -853,7 +867,18 @@ export const useFarmStore = create<FarmState>()(
         });
 
         try {
-          fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+          await fetch(`/api/expenses/${id}`, { method: 'DELETE' });
+          const curState = get();
+          await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              expenses: curState.expenses,
+              batches: curState.batches,
+              sales: curState.sales,
+              billingHistory: curState.billingHistory,
+            }),
+          });
         } catch {
           // ignore
         }
@@ -988,7 +1013,17 @@ export const useFarmStore = create<FarmState>()(
         });
 
         try {
-          fetch(`/api/sales/${id}`, { method: 'DELETE' }).catch(() => {});
+          await fetch(`/api/sales/${id}`, { method: 'DELETE' });
+          const curState = get();
+          await fetch('/api/sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sales: curState.sales,
+              batches: curState.batches,
+              expenses: curState.expenses,
+            }),
+          });
         } catch {}
 
         return { success: true };

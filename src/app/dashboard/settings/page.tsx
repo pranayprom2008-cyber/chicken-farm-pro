@@ -266,32 +266,7 @@ export default function SettingsPage() {
             </p>
           </button>
 
-          {/* Spatial Glass Theme */}
-          <button
-            type="button"
-            onClick={() => setTheme('spatial')}
-            className={`p-5 rounded-2xl border text-left transition-all ${
-              theme === 'spatial' || theme === 'spatial-glass'
-                ? 'border-sky-400 ring-2 ring-sky-500/30 bg-sky-950/20 shadow-lg'
-                : 'border-[var(--border-color)] hover:border-sky-500/40'
-            }`}
-          >
-            <div className="w-full h-20 bg-[#06090E] rounded-xl mb-3 border border-white/20 flex flex-col justify-between p-2.5 relative overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-br from-sky-500/20 via-transparent to-white/5 backdrop-blur-md pointer-events-none" />
-              <div className="flex gap-1 relative z-10">
-                <span className="w-2 h-2 rounded-full bg-sky-400 animate-pulse" />
-                <span className="w-8 h-2 rounded bg-white/30" />
-              </div>
-              <div className="w-16 h-3 rounded bg-sky-500/40 relative z-10" />
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="font-bold text-xs text-sky-300">Spatial Glass</span>
-              <Glasses className="w-4 h-4 text-sky-400" />
-            </div>
-            <p className="text-[11px] text-[var(--text-muted)] mt-1">
-              Apple visionOS clean optical glass & spatial room depth
-            </p>
-          </button>
+
 
           {/* Vibe Theme */}
           <button

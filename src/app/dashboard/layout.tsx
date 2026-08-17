@@ -16,15 +16,35 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const [mounted, setMounted] = useState(false);
 
+  // Real-time Cloud Sync Engine (Cross-device real-time sync & fast revalidation)
   useEffect(() => {
     setMounted(true);
     syncAll();
 
+    // 1. Periodic background sync every 4 seconds
     const syncInterval = setInterval(() => {
       syncAll();
-    }, 15000);
+    }, 4000);
 
-    return () => clearInterval(syncInterval);
+    // 2. Real-time sync on window focus or tab visibility change
+    const handleFocus = () => {
+      syncAll();
+    };
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        syncAll();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(syncInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [syncAll]);
 
   useEffect(() => {
@@ -39,17 +59,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [mounted, isAuthenticated, router]);
 
-  useEffect(() => {
-    if (typeof document !== 'undefined') {
-      document.documentElement.classList.remove('dark', 'obsidian', 'liquid-glass', 'liquid', 'organic', 'bubble');
-      if (theme === 'dark') {
-        document.documentElement.classList.add('dark');
-      } else if (theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass') {
-        document.documentElement.classList.add('liquid', 'liquid-glass', 'obsidian');
-      }
-    }
-  }, [theme]);
-
   if (!mounted) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
@@ -59,19 +68,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-300 relative">
+    <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden">
       <LiquidBackground />
+
+      {/* Primary Sidebar Desktop */}
       <Sidebar />
-      <div className="flex-1 flex flex-col relative z-10 overflow-hidden min-w-0">
+
+      {/* Main App Workspace */}
+      <div className="flex-1 flex flex-col min-w-0 z-10">
         <Header />
-        <main className="flex-1 overflow-y-auto p-3.5 sm:p-6 lg:p-8 pb-24 lg:pb-8">
-          <div className="mx-auto max-w-7xl">
-            <PageTransition>{children}</PageTransition>
-          </div>
+
+        <main className="flex-1 p-3.5 sm:p-5 md:p-7 max-w-[1700px] w-full mx-auto pb-24 md:pb-10">
+          <PageTransition>{children}</PageTransition>
         </main>
-        <MobileNav />
-        <ChickAI />
       </div>
+
+      {/* Mobile Navigation Dock */}
+      <MobileNav />
+
+      {/* ChickAI Voice & Intelligence Assistant */}
+      <ChickAI />
     </div>
   );
 }
