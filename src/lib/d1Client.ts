@@ -3,8 +3,11 @@
  * CHICKEN FARM PRO - CLOUDFLARE D1 DATABASE CLIENT
  * ==========================================================
  * Connects the Vercel Next.js application to Cloudflare D1 Database
- * via Cloudflare REST API and Cloudflare Worker Edge API.
+ * via Cloudflare REST API and Cloudflare Worker Edge API, with
+ * zero-downtime local replica fallback.
  */
+
+import { prisma } from './db';
 
 export interface D1QueryResult<T = any> {
   results: T[];
@@ -77,7 +80,18 @@ class CloudflareD1Client {
       }
     }
 
-    return { results: [], success: false, error: 'D1 offline or fallback' };
+    // 3. High-Fidelity Local / Fallback Executor
+    try {
+      if (sql.trim().toUpperCase().startsWith('SELECT')) {
+        const rows: any = await prisma.$queryRawUnsafe(sql, ...params);
+        return { results: (rows || []) as T[], success: true };
+      } else {
+        await prisma.$executeRawUnsafe(sql, ...params);
+        return { results: [], success: true };
+      }
+    } catch (e: any) {
+      return { results: [], success: false, error: e.message };
+    }
   }
 
   /**
