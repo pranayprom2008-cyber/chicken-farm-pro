@@ -8,12 +8,13 @@ import TiltCard from '@/components/TiltCard';
 
 export default function FlockHealthAdvisor() {
   const { stats, batches, theme } = useFarmStore();
-  const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
+  const safeBatches = batches || [];
+  const activeBatch = safeBatches.find((b) => b?.status === 'growing') || safeBatches[0];
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
 
-  const mortalityPct = stats.totalChicks > 0 ? (stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0)) : 0;
-  const totalChicks = stats.totalChicks || (activeBatch ? activeBatch.totalChicks : 0);
-  const deadChicks = stats.deadChicks || (activeBatch ? activeBatch.deadChicks : 0);
+  const totalChicks = stats?.totalChicks || (activeBatch ? activeBatch.totalChicks : 0) || 0;
+  const deadChicks = stats?.deadChicks || (activeBatch ? activeBatch.deadChicks : 0) || 0;
+  const mortalityPct = totalChicks > 0 ? (stats?.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0) || 0) : 0;
 
   // Determine health risk tier
   let statusTier: 'optimal' | 'caution' | 'alert' = 'optimal';
@@ -43,7 +44,7 @@ export default function FlockHealthAdvisor() {
       return [
         {
           title: '🚨 Immediate Veterinary Action Required',
-          desc: `Mortality is elevated at ${mortalityPct}%. Check for Newcastle Disease / Coccidiosis symptoms immediately.`,
+          desc: `Mortality is elevated at ${mortalityPct.toFixed(1)}%. Check for Newcastle Disease / Coccidiosis symptoms immediately.`,
           action: 'Administer water-soluble Sulpha/Antibiotic + Vitamin E & Selenium booster.',
           icon: <Stethoscope className="w-4 h-4 text-rose-400" />,
         },
@@ -58,47 +59,47 @@ export default function FlockHealthAdvisor() {
       return [
         {
           title: '⚠️ Moderate Mortality Spike Detected',
-          desc: `Flock loss is slightly above baseline (${mortalityPct}%). Check water nipple flow and temperature stability.`,
-          action: 'Add Liver tonic + Electrolytes in morning drinking water for 3 consecutive days.',
-          icon: <Droplets className="w-4 h-4 text-amber-400" />,
+          desc: `Cumulative loss reached ${mortalityPct.toFixed(1)}%. Inspect bird droppings for blood or discoloration.`,
+          action: 'Flush drinker lines with 5 ppm chlorine and provide probiotic supplement.',
+          icon: <AlertTriangle className="w-4 h-4 text-amber-400" />,
         },
         {
-          title: '🌡️ Brooding Temperature Calibration',
-          desc: 'Verify shed temperature is maintained between 24°C - 28°C to prevent chilling or heat exhaustion.',
-          action: 'Adjust side curtains and fogger spray intervals.',
+          title: '🌡️ Brooding Temperature Check',
+          desc: 'Ensure shed temperature matches growth day standard (Day 1: 33°C, Day 14: 28°C, Day 28: 22°C).',
+          action: 'Inspect curtain openings and prevent cold draft drafts near chick rings.',
           icon: <ThermometerSun className="w-4 h-4 text-amber-400" />,
         },
       ];
     } else {
       return [
         {
-          title: '✨ Flock Bio-Security & Health is Optimal',
-          desc: `Flock livability is outstanding at ${(100 - mortalityPct).toFixed(1)}% with standard commercial broiler performance.`,
-          action: 'Maintain strict footbath disinfectant (Potassium Permanganate) at shed entrance.',
+          title: '✅ Optimal Flock Livability',
+          desc: `Livability is ${(100 - mortalityPct).toFixed(1)}% across ${totalChicks.toLocaleString()} birds, well within safety thresholds.`,
+          action: 'Maintain standard Cobb 500 lighting schedule (20h light, 4h darkness).',
           icon: <CheckCircle className="w-4 h-4 text-emerald-400" />,
         },
         {
-          title: '🌾 Optimum FCR & Growth Curve Active',
-          desc: 'Feed consumption trajectory matches standard Cobb 500 growth chart without stress indicators.',
-          action: 'Ensure clean drinking water chlorine level (2-3 ppm) is tested daily.',
-          icon: <Sparkles className="w-4 h-4 text-emerald-400" />,
+          title: '💊 Scheduled Vaccination on Track',
+          desc: 'Lasota / Gumboro boostering schedule is aligned with current flock age.',
+          action: 'Verify drinking water temperature is below 25°C during vaccine administration.',
+          icon: <Sparkles className="w-4 h-4 text-teal-400" />,
         },
       ];
     }
   };
 
-  const adviceItems = getAdviceList();
+  const adviceList = getAdviceList();
 
   return (
-    <TiltCard maxTilt={5} glare={true}>
+    <TiltCard maxTilt={4} glare={true}>
       <div
         className={`p-6 sm:p-7 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
           isLiquid ? 'liquid-panel' : 'shadow-sm'
-        } flex flex-col justify-between h-full`}
+        } flex flex-col justify-between h-full relative overflow-hidden`}
       >
-        {/* Card Header */}
         <div>
-          <div className="flex items-center justify-between gap-3 mb-5">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
               <div
                 className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
@@ -109,84 +110,61 @@ export default function FlockHealthAdvisor() {
                     : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
                 }`}
               >
-                <HeartPulse className="w-6 h-6 animate-pulse" />
+                <HeartPulse className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-extrabold text-[var(--text-primary)] flex items-center gap-2">
-                  <span>AI Flock Health & Biosecurity Advisor</span>
+                <h3 className="text-base font-black text-[var(--text-primary)] flex items-center gap-1.5">
+                  <span>Flock Health Advisor</span>
                 </h3>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Live mortality rate & automated veterinary diagnostic guidelines
+                  Veterinary triage & bio-security protocol advisor
                 </p>
               </div>
             </div>
 
-            <div
-              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+            <span
+              className={`text-xs font-bold px-3 py-1 rounded-full border ${
                 statusTier === 'alert'
-                  ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                   : statusTier === 'caution'
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
               }`}
             >
-              <span className="w-2 h-2 rounded-full bg-current animate-ping" />
-              <span>{statusTier === 'alert' ? 'High Risk' : statusTier === 'caution' ? 'Caution' : 'Healthy'}</span>
-            </div>
+              {statusTier === 'alert' ? '🔴 High Risk' : statusTier === 'caution' ? '🟡 Watch' : '🟢 Optimal'}
+            </span>
           </div>
 
-          {/* Quick Metrics Bar */}
-          <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] mb-5 text-center">
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Flock Livability</span>
-              <span className="text-sm sm:text-base font-black text-emerald-400">
-                {(100 - mortalityPct).toFixed(1)}%
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Total Loss</span>
-              <span className="text-sm sm:text-base font-black text-rose-400">
-                {deadChicks.toLocaleString()} birds
-              </span>
-            </div>
-            <div>
-              <span className="text-[10px] uppercase font-bold text-[var(--text-muted)] block">Mortality %</span>
-              <span
-                className={`text-sm sm:text-base font-black ${
-                  statusTier === 'alert' ? 'text-rose-400' : statusTier === 'caution' ? 'text-amber-400' : 'text-emerald-400'
-                }`}
-              >
-                {mortalityPct.toFixed(2)}%
-              </span>
-            </div>
-          </div>
-
-          {/* Advice Items */}
+          {/* Advice cards */}
           <div className="space-y-3">
-            {adviceItems.map((item, idx) => (
+            {adviceList.map((item, idx) => (
               <div
                 key={idx}
-                className="p-3.5 rounded-2xl bg-[var(--bg-input)]/70 border border-[var(--border-color)] text-left"
+                className="p-3.5 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] space-y-1.5"
               >
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex items-center gap-2">
                   {item.icon}
                   <span className="text-xs font-bold text-[var(--text-primary)]">{item.title}</span>
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed mb-1.5">
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed pl-6">
                   {item.desc}
                 </p>
-                <div className="p-2 rounded-xl bg-black/20 text-[10px] font-semibold text-emerald-400 dark:text-emerald-300">
-                  <strong>Recommended Protocol:</strong> {item.action}
+                <div className="pl-6 pt-1">
+                  <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md inline-block">
+                    Recommended: {item.action}
+                  </span>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        {/* Footer info */}
-        <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-          <span>Active Batch: <strong>{activeBatch?.batchNumber || 'Batch-01'}</strong></span>
-          <span className="text-emerald-400 font-semibold">Standard Cobb 500 Protocol</span>
+        {/* Footer */}
+        <div className="mt-5 pt-4 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>Target Livability: 97.5%</span>
+          <span className="text-emerald-400 font-bold">
+            ● Current: {(100 - mortalityPct).toFixed(1)}%
+          </span>
         </div>
       </div>
     </TiltCard>

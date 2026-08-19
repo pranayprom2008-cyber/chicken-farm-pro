@@ -10,12 +10,16 @@ export default function AIFarmInsights() {
   const { stats, batches, expenses, sales, theme } = useFarmStore();
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
 
+  const safeBatches = batches || [];
+  const safeExpenses = expenses || [];
+
   // Build dynamic insights backed strictly by real database data
-  const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-  const mortalityPct = stats.totalChicks > 0 ? (stats.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0)) : 0;
-  const feedCost = expenses.filter((e) => e.category === 'Feed').reduce((sum, e) => sum + e.amount, 0);
-  const medCost = expenses.filter((e) => e.category === 'Medicine').reduce((sum, e) => sum + e.amount, 0);
-  const totalExp = stats.totalExpenditure || expenses.reduce((sum, e) => sum + e.amount, 0);
+  const activeBatch = safeBatches.find((b) => b?.status === 'growing') || safeBatches[0];
+  const totalChicks = stats?.totalChicks || 0;
+  const mortalityPct = totalChicks > 0 ? (stats?.mortalityPercentage || (activeBatch ? activeBatch.mortalityPercentage : 0) || 0) : 0;
+  const feedCost = safeExpenses.filter((e) => e?.category === 'Feed').reduce((sum, e) => sum + (e?.amount || 0), 0);
+  const medCost = safeExpenses.filter((e) => e?.category === 'Medicine').reduce((sum, e) => sum + (e?.amount || 0), 0);
+  const totalExp = stats?.totalExpenditure || safeExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
 
   const insights: {
     id: string;
@@ -26,7 +30,7 @@ export default function AIFarmInsights() {
     metric?: string;
   }[] = [];
 
-  if (batches.length === 0) {
+  if (safeBatches.length === 0) {
     insights.push({
       id: 'fresh-db',
       level: 'healthy',
@@ -58,8 +62,8 @@ export default function AIFarmInsights() {
       insights.push({
         id: 'mortality-warn',
         level: 'attention',
-        title: `${activeBatch?.batchNumber || 'Batch-01'} Mortality Baseline Caution`,
-        description: `Flock loss is slightly above the 2.5% target. Add electrolytes and liver tonic to drinking water.`,
+        title: `${activeBatch?.batchNumber || 'Batch-01'} Moderate Loss Rate`,
+        description: `Loss rate is ${mortalityPct.toFixed(2)}%. Check ventilation fans, water pressure, and brooding temperatures.`,
         icon: <AlertTriangle className="w-5 h-5 text-amber-400" />,
         metric: `${mortalityPct.toFixed(1)}% Mortality`,
       });
@@ -67,56 +71,33 @@ export default function AIFarmInsights() {
       insights.push({
         id: 'mortality-good',
         level: 'healthy',
-        title: 'Flock Livability is Outstanding',
-        description: `Livability is at ${(100 - mortalityPct).toFixed(1)}%, exceeding commercial Cobb 500 standards.`,
+        title: `${activeBatch?.batchNumber || 'Batch-01'} Flocks Thriving`,
+        description: `Livability is optimal at ${(100 - mortalityPct).toFixed(1)}%, outperforming standard Cobb 500 commercial benchmarks.`,
         icon: <CheckCircle2 className="w-5 h-5 text-emerald-400" />,
         metric: `${(100 - mortalityPct).toFixed(1)}% Livability`,
       });
     }
-  }
 
-  // Insight 2: Feed & Inventory
-  const feedRunwayDays = Number(((stats.feedRemaining || 1850) / ((stats.aliveChicks || 4880) * 0.13)).toFixed(1));
-  if (feedRunwayDays < 3.0) {
-    insights.push({
-      id: 'feed-runway-low',
-      level: 'critical',
-      title: 'Feed Inventory Running Low',
-      description: `Only ${feedRunwayDays} days of feed remain in storage. Place an order for Broiler Finisher feed today.`,
-      icon: <Wheat className="w-5 h-5 text-rose-400" />,
-      metric: `${feedRunwayDays} Days Left`,
-    });
-  } else {
-    insights.push({
-      id: 'feed-safe',
-      level: 'healthy',
-      title: 'Feed Conversion & Stock Stable',
-      description: `Feed stock covers ~${feedRunwayDays} days of consumption without supply bottleneck risk.`,
-      icon: <Wheat className="w-5 h-5 text-emerald-400" />,
-      metric: `${stats.feedRemaining || 1850} kg Stock`,
-    });
-  }
-
-  // Insight 3: Financial & Profit
-  const netProfit = stats.netRealizedProfit || (stats.totalRevenue - totalExp);
-  if (netProfit > 0) {
-    insights.push({
-      id: 'profit-pos',
-      level: 'healthy',
-      title: 'Positive Realized Farm Profit',
-      description: `Net farm earnings stand at ₹ ${netProfit.toLocaleString('en-IN')} with healthy operating margins.`,
-      icon: <TrendingUp className="w-5 h-5 text-emerald-400" />,
-      metric: `+ ₹ ${(netProfit / 1000).toFixed(0)}k Margin`,
-    });
-  } else {
-    insights.push({
-      id: 'profit-alloc',
-      level: 'attention',
-      title: 'Flock Investment Active',
-      description: `Flock grow-out capital is deployed (₹ ${totalExp.toLocaleString('en-IN')}). High profit expected at Day 42 harvest.`,
-      icon: <AlertTriangle className="w-5 h-5 text-cyan-400" />,
-      metric: `₹ ${(totalExp / 1000).toFixed(0)}k Invested`,
-    });
+    // Insight 2: Feed & Cost Allocation
+    if (totalExp > 0 && feedCost / totalExp > 0.72) {
+      insights.push({
+        id: 'feed-high',
+        level: 'attention',
+        title: 'Feed Expense Ratio Elevated',
+        description: `Feed constitutes ${Math.round((feedCost / totalExp) * 100)}% of expenses. Inspect feed trough spillages and adjust feeder height.`,
+        icon: <Wheat className="w-5 h-5 text-amber-400" />,
+        metric: `${Math.round((feedCost / totalExp) * 100)}% Feed Ratio`,
+      });
+    } else {
+      insights.push({
+        id: 'cost-balanced',
+        level: 'healthy',
+        title: 'Feed Conversion & Costs Balanced',
+        description: 'Operating expenses across feed, electricity, and medications are well-proportioned for commercial margin capture.',
+        icon: <TrendingUp className="w-5 h-5 text-teal-400" />,
+        metric: 'Stable FCR Ratio',
+      });
+    }
   }
 
   return (
@@ -124,66 +105,56 @@ export default function AIFarmInsights() {
       <div
         className={`p-6 sm:p-7 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
           isLiquid ? 'liquid-panel' : 'shadow-sm'
-        } flex flex-col justify-between h-full`}
+        } flex flex-col justify-between h-full relative overflow-hidden`}
       >
         <div>
           {/* Header */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-emerald-500/20 to-cyan-500/20 border border-emerald-500/30 flex items-center justify-center text-emerald-400">
-                <Sparkles className="w-6 h-6 text-amber-300 animate-pulse" />
+              <div className="w-11 h-11 rounded-2xl bg-teal-500/15 border border-teal-500/30 flex items-center justify-center text-teal-400">
+                <Sparkles className="w-6 h-6" />
               </div>
               <div>
-                <h3 className="text-base font-black text-[var(--text-primary)] flex items-center gap-2">
-                  <span>AI Farm Insights & Triage</span>
+                <h3 className="text-base font-black text-[var(--text-primary)] flex items-center gap-1.5">
+                  <span>AI Advisory Engine</span>
                 </h3>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Continuous pattern detection across mortality, feed, and finances
+                  Live anomaly detection & operational suggestions
                 </p>
               </div>
             </div>
 
-            <span className="px-3 py-1 rounded-full text-xs font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">
-              Autonomous
+            <span className="text-xs font-bold text-teal-400 bg-teal-500/10 px-2.5 py-1 rounded-full border border-teal-500/20">
+              {insights.length} Signals
             </span>
           </div>
 
           {/* Insights List */}
           <div className="space-y-3">
-            {insights.map((item) => (
+            {insights.map((ins) => (
               <div
-                key={item.id}
-                className={`p-4 rounded-2xl border transition-all ${
-                  item.level === 'critical'
-                    ? 'bg-rose-950/20 border-rose-500/30 text-rose-100'
-                    : item.level === 'attention'
-                    ? 'bg-amber-950/20 border-amber-500/30 text-amber-100'
-                    : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-100'
+                key={ins.id}
+                className={`p-3.5 rounded-2xl border transition-all ${
+                  ins.level === 'critical'
+                    ? 'bg-rose-950/20 border-rose-500/30 text-rose-200'
+                    : ins.level === 'attention'
+                    ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
+                    : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
                 }`}
               >
-                <div className="flex items-start justify-between gap-3 mb-1">
-                  <div className="flex items-center gap-2.5">
-                    {item.icon}
-                    <span className="font-extrabold text-xs text-[var(--text-primary)]">
-                      {item.title}
-                    </span>
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2">
+                    {ins.icon}
+                    <span className="font-bold text-xs text-[var(--text-primary)]">{ins.title}</span>
                   </div>
-                  {item.metric && (
-                    <span
-                      className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-lg border ${
-                        item.level === 'critical'
-                          ? 'bg-rose-500/20 border-rose-500/30 text-rose-300'
-                          : item.level === 'attention'
-                          ? 'bg-amber-500/20 border-amber-500/30 text-amber-300'
-                          : 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-                      }`}
-                    >
-                      {item.metric}
+                  {ins.metric && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-black/30 border border-white/10 font-mono text-[var(--text-primary)]">
+                      {ins.metric}
                     </span>
                   )}
                 </div>
-                <p className="text-[11px] text-[var(--text-secondary)] leading-relaxed pl-7">
-                  {item.description}
+                <p className="text-[11px] text-[var(--text-muted)] leading-relaxed pl-7">
+                  {ins.description}
                 </p>
               </div>
             ))}
@@ -191,9 +162,9 @@ export default function AIFarmInsights() {
         </div>
 
         {/* Footer */}
-        <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
-          <span>AI Engine: <strong>ChickAI Diagnostic Core</strong></span>
-          <span className="text-emerald-400 font-semibold">100% Database Backed</span>
+        <div className="mt-5 pt-4 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>Continuous Biometric Monitoring</span>
+          <span className="text-emerald-400 font-bold">● Active</span>
         </div>
       </div>
     </TiltCard>

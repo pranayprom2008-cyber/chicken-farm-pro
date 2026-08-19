@@ -10,12 +10,15 @@ export default function FeedForecastWidget() {
   const { stats, batches, expenses, theme } = useFarmStore();
   const isLiquid = theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass';
 
-  const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-  const aliveBirds = stats.totalChicks > 0 ? (stats.aliveChicks || (activeBatch ? activeBatch.aliveChicks : 0)) : 0;
+  const safeBatches = batches || [];
+  const activeBatch = safeBatches.find((b) => b?.status === 'growing') || safeBatches[0];
+  const totalChicks = stats?.totalChicks || 0;
+  const aliveBirds = totalChicks > 0 ? (stats?.aliveChicks || (activeBatch ? activeBatch.aliveChicks : 0) || 0) : 0;
 
   // Daily consumption rate: average ~130g per bird per day for mid-cycle broilers
   const dailyBurnKg = aliveBirds > 0 ? Math.round(aliveBirds * 0.13) : 0;
-  const totalStockKg = aliveBirds > 0 ? (stats.feedRemaining || Math.round(aliveBirds * 3.5)) : (stats.feedRemaining || 0);
+  const feedRemaining = stats?.feedRemaining || 0;
+  const totalStockKg = aliveBirds > 0 ? (feedRemaining || Math.round(aliveBirds * 3.5)) : feedRemaining;
   const bagsInStock = Math.floor(totalStockKg / 50);
 
   // Calculate days of feed left
@@ -62,99 +65,60 @@ export default function FeedForecastWidget() {
             </div>
 
             <span
-              className={`px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 ${
+              className={`text-xs font-bold px-3 py-1 rounded-full border ${
                 stockStatus === 'critical'
-                  ? 'bg-rose-500/15 text-rose-400 border border-rose-500/30'
+                  ? 'bg-rose-500/15 text-rose-400 border-rose-500/30'
                   : stockStatus === 'reorder'
-                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
-                  : 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
+                  : 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
               }`}
             >
-              {stockStatus === 'critical'
-                ? '🚨 Urgent Stockout'
-                : stockStatus === 'reorder'
-                ? '⚠️ Reorder Soon'
-                : '✅ Safe Inventory'}
+              {stockStatus === 'critical' ? '🚨 Order Now' : stockStatus === 'reorder' ? '🟡 Reorder Soon' : '🟢 Ample Stock'}
             </span>
           </div>
 
-          {/* Large Hero Metric: Days of Feed Left */}
-          <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] text-center my-4">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-              Estimated Feed Inventory Runway
-            </span>
-            <div className="text-4xl sm:text-5xl font-black text-[var(--text-primary)] my-1">
-              <span
-                className={
-                  stockStatus === 'critical'
-                    ? 'text-rose-400'
-                    : stockStatus === 'reorder'
-                    ? 'text-amber-400'
-                    : 'text-emerald-400'
-                }
-              >
-                {daysRemaining}
-              </span>{' '}
-              <span className="text-xl font-bold text-[var(--text-secondary)]">Days</span>
-            </div>
-            <p className="text-xs text-[var(--text-muted)] font-medium">
-              Based on {aliveBirds.toLocaleString()} active birds consuming ~{dailyBurnKg} kg/day
-            </p>
-          </div>
-
-          {/* Breakdown Grid */}
-          <div className="grid grid-cols-2 gap-3 mb-4">
-            <div className="p-3.5 rounded-2xl bg-[var(--bg-input)]/70 border border-[var(--border-color)]">
-              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">Total Stock</span>
-              <div className="text-lg font-black text-[var(--text-primary)] mt-0.5">
-                {totalStockKg.toLocaleString()} kg
-              </div>
-              <span className="text-[11px] text-emerald-400 font-semibold">
-                ~{bagsInStock} Bags (50kg)
+          {/* Large Stock Countdown Card */}
+          <div className="p-5 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] mb-4 flex items-center justify-between">
+            <div>
+              <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider block">
+                Estimated Feed Runway
               </span>
+              <div className="text-3xl sm:text-4xl font-black text-[var(--text-primary)] mt-1 flex items-baseline gap-2">
+                <span>{daysRemaining || 0}</span>
+                <span className="text-sm font-bold text-[var(--text-muted)]">Days of Feed Left</span>
+              </div>
             </div>
 
-            <div className="p-3.5 rounded-2xl bg-[var(--bg-input)]/70 border border-[var(--border-color)]">
-              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">Daily Consumption</span>
-              <div className="text-lg font-black text-[var(--text-primary)] mt-0.5">
-                {dailyBurnKg} kg/day
-              </div>
-              <span className="text-[11px] text-teal-400 font-semibold">
-                ~{(dailyBurnKg / 50).toFixed(1)} Bags/day
+            <div className="text-right">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">Current Silo Stock</span>
+              <span className="text-lg font-black text-emerald-400 block mt-0.5">
+                ~{bagsInStock} Bags ({totalStockKg.toLocaleString()} kg)
               </span>
             </div>
           </div>
 
-          {/* Reorder Recommendation Box */}
-          <div
-            className={`p-3.5 rounded-2xl border flex items-start gap-3 ${
-              stockStatus === 'critical'
-                ? 'bg-rose-950/20 border-rose-500/30 text-rose-200'
-                : stockStatus === 'reorder'
-                ? 'bg-amber-950/20 border-amber-500/30 text-amber-200'
-                : 'bg-emerald-950/20 border-emerald-500/30 text-emerald-200'
-            }`}
-          >
-            <ShoppingCart className="w-5 h-5 flex-shrink-0 mt-0.5 text-current" />
-            <div className="text-xs">
-              <span className="font-bold block text-[var(--text-primary)]">
-                {stockStatus === 'critical'
-                  ? 'Urgent Reorder Alert!'
-                  : stockStatus === 'reorder'
-                  ? 'Upcoming Feed Order Suggested'
-                  : 'Feed Supply on Target'}
+          {/* Consumption Specs */}
+          <div className="grid grid-cols-2 gap-3 text-xs mb-4">
+            <div className="p-3 rounded-2xl bg-[var(--bg-input)]/60 border border-[var(--border-color)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">Flock Daily Burn Rate</span>
+              <span className="text-sm font-black text-[var(--text-primary)] mt-0.5 block">
+                {dailyBurnKg.toLocaleString()} kg / Day
               </span>
-              <p className="text-[11px] text-[var(--text-secondary)] mt-0.5">
-                Suggested purchase: <strong>{suggestedReorderBags} bags</strong> of Broiler Finisher feed to cover the remainder of the 45-day cycle.
-              </p>
+            </div>
+
+            <div className="p-3 rounded-2xl bg-[var(--bg-input)]/60 border border-[var(--border-color)]">
+              <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase block">Finisher Deficit</span>
+              <span className="text-sm font-black text-amber-400 mt-0.5 block">
+                +{suggestedReorderBags} Bags needed to harvest
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
-          <span>Standard 50kg Bag Rate: <strong>₹ 2,150</strong></span>
-          <span className="text-emerald-400 font-semibold">Automatic Burn-Rate Tracking</span>
+        {/* Footer info */}
+        <div className="mt-4 pt-4 border-t border-[var(--border-color)] flex items-center justify-between text-xs text-[var(--text-muted)]">
+          <span>Feed Conversion Standard: 1.55 FCR</span>
+          <span className="text-emerald-400 font-bold">● Auto-calculated</span>
         </div>
       </div>
     </TiltCard>
