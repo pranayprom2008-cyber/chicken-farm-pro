@@ -97,6 +97,7 @@ export default function DashboardPage() {
     error,
     fetchDashboardData,
     fetchBatches,
+    syncAll,
   } = useFarmStore();
 
   const [mounted, setMounted] = useState(false);
@@ -105,28 +106,19 @@ export default function DashboardPage() {
 
   useEffect(() => {
     setMounted(true);
-    fetchDashboardData();
-    fetchBatches();
-  }, [fetchDashboardData, fetchBatches]);
+    syncAll();
+  }, [syncAll]);
 
-  const isSpatial = theme === 'spatial' || theme === 'spatial-glass';
   const currency = settings?.currency || '₹';
 
-  const formatMoney = (val: number) => {
-    return `${currency} ${val.toLocaleString('en-IN')}`;
+  const formatMoney = (val?: number | null) => {
+    const num = typeof val === 'number' && !isNaN(val) ? val : 0;
+    return `${currency} ${num.toLocaleString('en-IN')}`;
   };
 
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    const name = user?.name ? user.name.toUpperCase() : 'FARM OPERATOR';
-    if (hour < 12) return `GOOD MORNING, ${name}`;
-    if (hour < 17) return `GOOD AFTERNOON, ${name}`;
-    return `GOOD EVENING, ${name}`;
-  };
+  const activeBatch = (batches || []).find((b) => b?.status === 'growing') || batches?.[0] || null;
 
-  const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-
-  // Top 4 Primary Spatial Cards
+  // Top 4 Primary Metric Cards
   const coreStats = [
     {
       id: 'activeBatches',
@@ -231,11 +223,11 @@ export default function DashboardPage() {
   ];
 
   const pieData = [
-    { name: 'Feed', value: stats?.categoryExpenses.feed || 1, color: '#10B981' },
-    { name: 'Medicine', value: stats?.categoryExpenses.medicine || 0, color: '#8B5CF6' },
-    { name: 'Electricity', value: stats?.categoryExpenses.electricity || 0, color: '#06B6D4' },
-    { name: 'Labour', value: stats?.categoryExpenses.labour || 0, color: '#F59E0B' },
-    { name: 'Maintenance', value: stats?.categoryExpenses.maintenance || 0, color: '#EC4899' },
+    { name: 'Feed', value: stats?.categoryExpenses?.feed || 1, color: '#10B981' },
+    { name: 'Medicine', value: stats?.categoryExpenses?.medicine || 0, color: '#8B5CF6' },
+    { name: 'Electricity', value: stats?.categoryExpenses?.electricity || 0, color: '#06B6D4' },
+    { name: 'Labour', value: stats?.categoryExpenses?.labour || 0, color: '#F59E0B' },
+    { name: 'Maintenance', value: stats?.categoryExpenses?.maintenance || 0, color: '#EC4899' },
   ].filter((d) => d.value > 0);
 
   const monthlyData = stats?.monthlyChartData && stats.monthlyChartData.length > 0
@@ -248,11 +240,17 @@ export default function DashboardPage() {
         { month: 'Feb', expense: 0, revenue: 0, profit: 0 },
       ];
 
-  if (!mounted) return null;
+  if (!mounted) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-3 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-7 pb-12">
-      {/* ── VisionOS Spatial Category Filter Pills (Matches Reference UI) ── */}
+      {/* Category Filter Pills */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
         {categoryPills.map((pill) => {
           const isActive = activeCategoryTab === pill.id;
@@ -272,7 +270,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── visionOS Cinematic Spatial Hero Spotlight Card (Matches Reference UI) ── */}
+      {/* Hero Spotlight Card */}
       <TiltCard maxTilt={3.5} glare={true}>
         <div className="relative rounded-[2.25rem] overflow-hidden spatial-glass-elevated p-6 sm:p-8 bg-gradient-to-r from-sky-950/40 via-emerald-950/30 to-black/60 border border-white/15 shadow-2xl">
           {/* Ambient Background Ray */}
@@ -286,12 +284,12 @@ export default function DashboardPage() {
                 <span>Active Commercial Grow-Out</span>
               </span>
               <span className="text-xs text-white/60 font-mono">
-                {stats?.aliveChicks.toLocaleString()} Birds Active
+                {(stats?.aliveChicks || 0).toLocaleString()} Birds Active
               </span>
             </div>
 
             <h1 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-tight">
-              {activeBatch ? `${activeBatch.batchNumber} • ${activeBatch.breedType}` : 'Smart Poultry Precision OS'}
+              {activeBatch ? `${activeBatch.batchNumber || 'Batch'} • ${activeBatch.breedType || 'Broiler'}` : 'Smart Poultry Precision OS'}
             </h1>
 
             <p className="text-xs sm:text-sm text-slate-300 font-normal leading-relaxed max-w-xl">
@@ -300,7 +298,7 @@ export default function DashboardPage() {
                 : 'Manage every flock, monitor real-time environmental biometrics, and forecast harvesting margins through one spatial glass ecosystem.'}
             </p>
 
-            {/* VisionOS Tactile Pill Action Buttons */}
+            {/* Action Buttons */}
             <div className="flex flex-wrap items-center gap-3 pt-2">
               <Link
                 href="/dashboard/batches"
@@ -330,7 +328,7 @@ export default function DashboardPage() {
         </div>
       </TiltCard>
 
-      {/* ── 4 Core Spatial Glass Metric Cards with Circular Action Badges ── */}
+      {/* 4 Core Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
         {coreStats.map((c) => {
           const Icon = c.icon;
@@ -342,7 +340,6 @@ export default function DashboardPage() {
                     <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                       {c.title}
                     </span>
-                    {/* VisionOS Circular Action Badge */}
                     <div className="w-9 h-9 rounded-full bg-white/10 group-hover:bg-white/20 border border-white/15 flex items-center justify-center text-white transition-transform group-hover:scale-110 shadow-sm">
                       <Icon className="w-4 h-4 text-white" />
                     </div>
@@ -364,7 +361,7 @@ export default function DashboardPage() {
         })}
       </div>
 
-      {/* ── Floating Spatial Quick Actions Dock ── */}
+      {/* Quick Actions Dock */}
       <div className="spatial-glass p-3.5 sm:p-4">
         <div className="flex items-center gap-2 mb-2.5 px-1 text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
           <Sparkles className="w-3.5 h-3.5 text-amber-300" />
@@ -389,7 +386,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── 🧠 AI Farm Intelligence Spatial Command Center ── */}
+      {/* AI Farm Intelligence Command Center */}
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-2">
@@ -416,7 +413,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Secondary Biometric & Utility Metrics ── */}
+      {/* Secondary Biometric & Utility Metrics */}
       <div className="space-y-3">
         <span className="text-[11px] font-bold text-[var(--text-muted)] uppercase tracking-wider block px-1">
           Biometric & Utility Breakdown
@@ -455,9 +452,8 @@ export default function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* ── Spatial Financial & Cost Visualizations ── */}
+      {/* Financial Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        {/* Revenue vs Operating Expenses Area Chart */}
         <div className="lg:col-span-8">
           <div className="spatial-glass p-6 h-full flex flex-col justify-between">
             <div className="flex items-center justify-between mb-6">

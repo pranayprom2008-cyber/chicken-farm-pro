@@ -82,7 +82,7 @@ export default function Header() {
 
         {/* Quick Header Theme Switcher */}
         <div className="hidden sm:block">
-          <ThemeToggle />
+          <ThemeToggle inHeader />
         </div>
 
         {/* User Profile Avatar */}

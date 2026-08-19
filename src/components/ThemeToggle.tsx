@@ -4,7 +4,7 @@ import React from 'react';
 import { Sun, Moon, Sparkles } from 'lucide-react';
 import { useFarmStore } from '@/store/useFarmStore';
 
-export default function ThemeToggle() {
+export default function ThemeToggle({ inHeader = false }: { inHeader?: boolean }) {
   const { theme, setTheme, sidebarOpen } = useFarmStore();
 
   const themes = [
@@ -13,25 +13,31 @@ export default function ThemeToggle() {
     { id: 'vibe', icon: Sparkles, label: 'Vibe' },
   ];
 
+  const isVertical = !inHeader && !sidebarOpen;
+
   return (
     <div
-      className={`p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl ${
-        !sidebarOpen ? 'flex flex-col gap-1' : 'grid grid-cols-3 gap-1 w-full'
+      className={`p-1 bg-[var(--bg-input)] border border-[var(--border-color)] rounded-2xl flex items-center gap-1 ${
+        isVertical ? 'flex-col' : 'flex-row'
       }`}
     >
       {themes.map((t) => {
         const isActive =
           theme === t.id ||
-          (t.id === 'dark' && (theme === 'spatial' || theme === 'spatial-glass' || theme === 'liquid' || theme === 'obsidian' || theme === 'liquid-glass'));
+          (t.id === 'dark' &&
+            (theme === 'spatial' ||
+              theme === 'spatial-glass' ||
+              theme === 'liquid' ||
+              theme === 'obsidian' ||
+              theme === 'liquid-glass'));
         const Icon = t.icon;
 
         return (
           <button
             key={t.id}
+            type="button"
             onClick={() => setTheme(t.id as any)}
-            className={`flex items-center justify-center gap-1.5 px-2 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
-              !sidebarOpen ? 'p-2.5' : 'w-full'
-            } ${
+            className={`flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer select-none ${
               isActive
                 ? t.id === 'light'
                   ? 'bg-white text-amber-600 shadow-sm border border-amber-200'
@@ -43,7 +49,7 @@ export default function ThemeToggle() {
             title={t.label}
           >
             <Icon className="w-3.5 h-3.5 flex-shrink-0" />
-            {sidebarOpen && <span className="text-[11px] font-bold truncate">{t.label}</span>}
+            {(inHeader || sidebarOpen) && <span className="text-[11px] font-bold truncate">{t.label}</span>}
           </button>
         );
       })}
