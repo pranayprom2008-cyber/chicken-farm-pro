@@ -79,19 +79,26 @@ export default function BatchesPage() {
 
   useEffect(() => {
     fetchBatches();
-  }, [fetchBatches]);
+    syncAll();
+  }, [fetchBatches, syncAll]);
 
-  const filteredBatches = batches.filter((b) => {
+  const safeBatches = Array.isArray(batches) ? batches : [];
+
+  const filteredBatches = safeBatches.filter((b) => {
+    if (!b) return false;
     const matchesStatus = statusFilter === 'all' || b.status === statusFilter;
+    const batchNum = b.batchNumber || '';
+    const batchName = b.batchName || '';
+    const breed = b.breedType || '';
     const matchesSearch =
-      b.batchNumber.toLowerCase().includes(search.toLowerCase()) ||
-      (b.batchName && b.batchName.toLowerCase().includes(search.toLowerCase())) ||
-      (b.breedType && b.breedType.toLowerCase().includes(search.toLowerCase()));
+      batchNum.toLowerCase().includes(search.toLowerCase()) ||
+      batchName.toLowerCase().includes(search.toLowerCase()) ||
+      breed.toLowerCase().includes(search.toLowerCase());
     return matchesStatus && matchesSearch;
   });
 
   const handleOpenCreateModal = () => {
-    const nextNum = `B-${new Date().getFullYear()}-${String(batches.length + 1).padStart(2, '0')}`;
+    const nextNum = `B-${new Date().getFullYear()}-${String(safeBatches.length + 1).padStart(2, '0')}`;
     setForm({
       ...emptyBatchForm,
       batchNumber: nextNum,
@@ -105,7 +112,7 @@ export default function BatchesPage() {
     if (e) e.preventDefault();
     setModalError(null);
 
-    const batchNum = form.batchNumber.trim() || `B-${new Date().getFullYear()}-${String(batches.length + 1).padStart(2, '0')}`;
+    const batchNum = form.batchNumber.trim() || `B-${new Date().getFullYear()}-${String(safeBatches.length + 1).padStart(2, '0')}`;
     const chicksCount = Number(form.totalChicks);
 
     if (chicksCount <= 0) {
@@ -158,15 +165,15 @@ export default function BatchesPage() {
   const openEditModal = (batch: Batch) => {
     setSelectedBatchId(batch.id);
     setForm({
-      batchNumber: batch.batchNumber,
+      batchNumber: batch.batchNumber || '',
       batchName: batch.batchName || '',
-      breedType: batch.breedType,
-      totalChicks: batch.totalChicks,
-      deadChicks: batch.deadChicks,
-      durationDays: batch.durationDays,
+      breedType: batch.breedType || 'Cobb 500 (Broiler)',
+      totalChicks: batch.totalChicks || 0,
+      deadChicks: batch.deadChicks || 0,
+      durationDays: batch.durationDays || 45,
       startDate: batch.startDate ? batch.startDate.split('T')[0] : new Date().toISOString().split('T')[0],
       expectedEndDate: batch.expectedEndDate ? batch.expectedEndDate.split('T')[0] : '',
-      status: batch.status,
+      status: batch.status || 'growing',
       notes: batch.notes || '',
     });
     setModalError(null);
@@ -205,6 +212,21 @@ export default function BatchesPage() {
     }
   };
 
+  const formatSafeDate = (dStr?: string | null, includeYear = false) => {
+    if (!dStr) return '—';
+    try {
+      const d = new Date(dStr);
+      if (isNaN(d.getTime())) return '—';
+      return d.toLocaleDateString('en-IN', {
+        day: 'numeric',
+        month: 'short',
+        ...(includeYear ? { year: 'numeric' } : {}),
+      });
+    } catch {
+      return '—';
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header & New Batch Action */}
@@ -221,7 +243,7 @@ export default function BatchesPage() {
         <div className="flex items-center gap-2.5">
           <button
             onClick={() => {
-              setSelectedBatchForSchedule(batches.find((b) => b.status === 'growing') || batches[0] || null);
+              setSelectedBatchForSchedule(safeBatches.find((b) => b?.status === 'growing') || safeBatches[0] || null);
               setShowScheduleModal(true);
             }}
             className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-bold text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 transition-all cursor-pointer"
@@ -295,7 +317,7 @@ export default function BatchesPage() {
               <Bird className="w-12 h-12 mx-auto text-[var(--text-muted)] opacity-40 mb-3" />
               <h3 className="text-base font-semibold text-[var(--text-primary)]">No Batches Found</h3>
               <p className="text-xs text-[var(--text-muted)] mt-1">
-                {batches.length === 0
+                {safeBatches.length === 0
                   ? 'Start by creating your first poultry batch to track birds, feed, and mortality.'
                   : 'No batches matched your search filter.'}
               </p>
@@ -309,435 +331,466 @@ export default function BatchesPage() {
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredBatches.map((batch) => {
-            const startFormatted = new Date(batch.startDate).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-            });
-            const endFormatted = new Date(batch.expectedEndDate).toLocaleDateString('en-IN', {
-              day: 'numeric',
-              month: 'short',
-              year: 'numeric',
-            });
+              {filteredBatches.map((batch) => {
+                const startFormatted = formatSafeDate(batch.startDate);
+                const endFormatted = formatSafeDate(batch.expectedEndDate, true);
 
-            return (
-              <TiltCard key={batch.id} maxTilt={6} glare={true}>
-                <div
-                  className={`p-6 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col justify-between transition-all duration-300 h-full ${
-                    isLiquid ? 'liquid-panel hover:border-cyan-500/40' : 'shadow-sm hover:shadow-md'
-                  }`}
-                >
-                  <div>
-                    {/* Top Header */}
-                    <div className="flex items-start justify-between gap-2 mb-3">
+                return (
+                  <TiltCard key={batch.id || batch.batchNumber} maxTilt={6} glare={true}>
+                    <div
+                      className={`p-6 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col justify-between transition-all duration-300 h-full ${
+                        isLiquid ? 'liquid-panel hover:border-cyan-500/40' : 'shadow-sm hover:shadow-md'
+                      }`}
+                    >
                       <div>
-                        <div className="flex items-center gap-2">
-                          <span className="text-base font-extrabold text-[var(--text-primary)]">
-                            {batch.batchNumber}
-                          </span>
-                          <span
-                            className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
-                              batch.status === 'growing'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : batch.status === 'completed'
-                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            }`}
-                          >
-                            {batch.status}
-                          </span>
+                        {/* Top Header */}
+                        <div className="flex items-start justify-between gap-2 mb-3">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-base font-extrabold text-[var(--text-primary)]">
+                                {batch.batchNumber || 'Batch'}
+                              </span>
+                              <span
+                                className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${
+                                  batch.status === 'growing'
+                                    ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                    : batch.status === 'completed'
+                                    ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                    : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                }`}
+                              >
+                                {batch.status || 'growing'}
+                              </span>
+                            </div>
+                            <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium line-clamp-1">
+                              {batch.batchName || batch.breedType || 'Broiler'}
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => openEditModal(batch)}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-colors cursor-pointer"
+                              title="Edit Batch"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(batch.id, batch.batchNumber || 'Batch')}
+                              className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              title="Delete Batch"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
                         </div>
-                        <p className="text-xs text-[var(--text-secondary)] mt-0.5 font-medium line-clamp-1">
-                          {batch.batchName || batch.breedType}
-                        </p>
+
+                        {/* Growth Progress Bar */}
+                        <div className="mb-4">
+                          <div className="flex justify-between text-[11px] text-[var(--text-muted)] mb-1">
+                            <span>Day {batch.daysElapsed || 1} of {batch.durationDays || 45}</span>
+                            <span className="font-semibold text-cyan-400">{batch.growthProgress || 0}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.max(0, batch.growthProgress || 0))}%` }}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Biometric Numbers Grid */}
+                        <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-[var(--bg-input)] mb-4 text-center">
+                          <div>
+                            <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Total</span>
+                            <span className="text-sm font-bold text-[var(--text-primary)]">
+                              {(batch.totalChicks || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Alive</span>
+                            <span className="text-sm font-bold text-emerald-400">
+                              {(batch.aliveChicks || 0).toLocaleString()}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Dead</span>
+                            <span className="text-sm font-bold text-rose-400">
+                              {(batch.deadChicks || 0).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Date and Financial Metrics */}
+                        <div className="space-y-1.5 text-xs text-[var(--text-secondary)] mb-4">
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                              <Calendar className="w-3.5 h-3.5" /> Start - Harvest:
+                            </span>
+                            <span className="font-medium text-[var(--text-primary)]">
+                              {startFormatted} – {endFormatted}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                              <DollarSign className="w-3.5 h-3.5" /> Total Cost:
+                            </span>
+                            <span className="font-bold text-[var(--text-primary)]">
+                              ₹ {(batch.totalExpenditure || 0).toLocaleString('en-IN')}
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
+                              <Scale className="w-3.5 h-3.5" /> Cost / Chick:
+                            </span>
+                            <span className="font-bold text-emerald-400">
+                              ₹ {(batch.costPerChick || 0).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-1">
+                      {/* Bottom Action Buttons */}
+                      <div className="pt-3 border-t border-[var(--border-color)] grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <button
-                          onClick={() => openEditModal(batch)}
-                          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-input)] transition-colors"
-                          title="Edit Batch"
+                          onClick={() => {
+                            setSelectedBatchForSchedule(batch);
+                            setShowScheduleModal(true);
+                          }}
+                          className="w-full py-2.5 rounded-xl text-xs font-semibold bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] text-emerald-400 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <Edit2 className="w-3.5 h-3.5" />
+                          <Calendar className="w-3.5 h-3.5" />
+                          <span>45-Day Vaccine Plan</span>
                         </button>
                         <button
-                          onClick={() => handleDelete(batch.id, batch.batchNumber)}
-                          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors"
-                          title="Delete Batch"
+                          onClick={() => {
+                            setSelectedBatchId(batch.id);
+                            setShowDailyRecordModal(true);
+                          }}
+                          className="w-full py-2.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5" />
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>Daily Entry</span>
                         </button>
                       </div>
                     </div>
-
-                    {/* Growth Progress Bar */}
-                    <div className="mb-4">
-                      <div className="flex justify-between text-[11px] text-[var(--text-muted)] mb-1">
-                        <span>Day {batch.daysElapsed} of {batch.durationDays}</span>
-                        <span className="font-semibold text-cyan-400">{batch.growthProgress}%</span>
-                      </div>
-                      <div className="w-full h-2 rounded-full bg-[var(--bg-input)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400 transition-all duration-500"
-                          style={{ width: `${Math.min(100, batch.growthProgress)}%` }}
-                        />
-                      </div>
-                    </div>
-
-                    {/* Biometric Numbers Grid */}
-                    <div className="grid grid-cols-3 gap-2.5 p-3 rounded-2xl bg-[var(--bg-input)] mb-4 text-center">
-                      <div>
-                        <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Total</span>
-                        <span className="text-sm font-bold text-[var(--text-primary)]">
-                          {batch.totalChicks.toLocaleString()}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Alive</span>
-                        <span className="text-sm font-bold text-emerald-400">
-                          {batch.aliveChicks.toLocaleString()}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] font-medium text-[var(--text-muted)] uppercase block">Dead</span>
-                        <span className="text-sm font-bold text-rose-400">
-                          {batch.deadChicks.toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Date and Financial Metrics */}
-                    <div className="space-y-1.5 text-xs text-[var(--text-secondary)] mb-4">
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
-                          <Calendar className="w-3.5 h-3.5" /> Start - Harvest:
-                        </span>
-                        <span className="font-medium text-[var(--text-primary)]">
-                          {startFormatted} – {endFormatted}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
-                          <DollarSign className="w-3.5 h-3.5" /> Total Cost:
-                        </span>
-                        <span className="font-bold text-[var(--text-primary)]">
-                          ₹ {batch.totalExpenditure.toLocaleString('en-IN')}
-                        </span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="flex items-center gap-1.5 text-[var(--text-muted)]">
-                          <Scale className="w-3.5 h-3.5" /> Cost / Chick:
-                        </span>
-                        <span className="font-bold text-emerald-400">
-                          ₹ {batch.costPerChick.toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Bottom Action Buttons */}
-                  <div className="pt-3 border-t border-[var(--border-color)] grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    <button
-                      onClick={() => {
-                        setSelectedBatchForSchedule(batch);
-                        setShowScheduleModal(true);
-                      }}
-                      className="w-full py-2.5 rounded-xl text-xs font-semibold bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] text-emerald-400 border border-emerald-500/30 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Calendar className="w-3.5 h-3.5" />
-                      <span>45-Day Vaccine Plan</span>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedBatchId(batch.id);
-                        setShowDailyRecordModal(true);
-                      }}
-                      className="w-full py-2.5 rounded-xl text-xs font-semibold bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] text-[var(--text-primary)] border border-[var(--border-color)] transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
-                    >
-                      <Activity className="w-3.5 h-3.5 text-cyan-400" />
-                      <span>Log Daily Telemetry</span>
-                    </button>
-                  </div>
-                </div>
-              </TiltCard>
-            );
-          })}
-        </div>
-      )}
+                  </TiltCard>
+                );
+              })}
+            </div>
+          )}
         </motion.div>
       </AnimatePresence>
 
-      {/* Create / Edit Batch Modal */}
-      {(showCreateModal || showEditModal) && (
-        <Modal
-          isOpen={showCreateModal || showEditModal}
-          onClose={() => {
-            setShowCreateModal(false);
-            setShowEditModal(false);
-          }}
-          title={showCreateModal ? 'Create New Poultry Batch' : 'Edit Batch Information'}
-        >
-          <form onSubmit={showCreateModal ? handleCreate : handleEdit} className="space-y-4">
-            {modalError && (
-              <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-400 flex-shrink-0" />
-                <span>{modalError}</span>
-              </div>
-            )}
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Batch Number *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={form.batchNumber}
-                  onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
-                  placeholder="e.g. B-2026-01"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Batch Name
-                </label>
-                <input
-                  type="text"
-                  value={form.batchName}
-                  onChange={(e) => setForm({ ...form, batchName: e.target.value })}
-                  placeholder="e.g. Summer Broiler Flock A"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
+      {/* Modal: Create Batch */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        title="Create New Poultry Batch"
+      >
+        <form onSubmit={handleCreate} className="space-y-4">
+          {modalError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>{modalError}</span>
             </div>
+          )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Breed Type
-                </label>
-                <select
-                  value={form.breedType}
-                  onChange={(e) => setForm({ ...form, breedType: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                >
-                  <option value="Cobb 500 (Broiler)">Cobb 500 (Broiler)</option>
-                  <option value="Ross 308 (Broiler)">Ross 308 (Broiler)</option>
-                  <option value="Hubbard Classic">Hubbard Classic</option>
-                  <option value="BV 300 (Layer)">BV 300 (Layer)</option>
-                  <option value="Country / Desi Bird">Country / Desi Bird</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Status
-                </label>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as any })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                >
-                  <option value="growing">Growing (Active)</option>
-                  <option value="completed">Completed</option>
-                  <option value="sold">Sold</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Total Chicks *
-                </label>
-                <input
-                  type="number"
-                  required
-                  min="1"
-                  value={form.totalChicks}
-                  onChange={(e) => setForm({ ...form, totalChicks: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Dead Chicks (Init)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={form.deadChicks}
-                  onChange={(e) => setForm({ ...form, deadChicks: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Cycle (Days)
-                </label>
-                <input
-                  type="number"
-                  min="10"
-                  value={form.durationDays}
-                  onChange={(e) => setForm({ ...form, durationDays: Number(e.target.value) })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Start Date
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Batch Number *
+              </label>
+              <input
+                type="text"
+                required
+                value={form.batchNumber}
+                onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Batch Name (Optional)
+              </label>
+              <input
+                type="text"
+                placeholder="e.g. Shed 1 Monsoon Flock"
+                value={form.batchName}
+                onChange={(e) => setForm({ ...form, batchName: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Breed Type
+              </label>
+              <select
+                value={form.breedType}
+                onChange={(e) => setForm({ ...form, breedType: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              >
+                <option value="Cobb 500 (Broiler)">Cobb 500 (Broiler)</option>
+                <option value="Ross 308 (Broiler)">Ross 308 (Broiler)</option>
+                <option value="Hubbard (Broiler)">Hubbard (Broiler)</option>
+                <option value="BV 300 (Layer)">BV 300 (Layer)</option>
+                <option value="Country Chicken (Desi)">Country Chicken (Desi)</option>
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Total Chicks Stocked *
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={form.totalChicks}
+                onChange={(e) => setForm({ ...form, totalChicks: Number(e.target.value) })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Placement Start Date *
               </label>
               <input
                 type="date"
+                required
                 value={form.startDate}
                 onChange={(e) => setForm({ ...form, startDate: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
               />
             </div>
-
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Notes
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Cycle Duration (Days)
               </label>
-              <textarea
-                rows={2}
-                value={form.notes}
-                onChange={(e) => setForm({ ...form, notes: e.target.value })}
-                placeholder="Environment settings, hatchery details, vaccination history, etc."
+              <input
+                type="number"
+                value={form.durationDays}
+                onChange={(e) => setForm({ ...form, durationDays: Number(e.target.value) })}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
               />
             </div>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setShowCreateModal(false);
-                  setShowEditModal(false);
-                }}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50"
-              >
-                {isSubmitting
-                  ? 'Saving to DB...'
-                  : showCreateModal
-                  ? 'Create Batch'
-                  : 'Save Changes'}
-              </button>
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+              Notes & Batch Details
+            </label>
+            <textarea
+              rows={2}
+              value={form.notes}
+              onChange={(e) => setForm({ ...form, notes: e.target.value })}
+              placeholder="Hatchery source, initial weight, chick box condition..."
+              className="w-full px-3.5 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center gap-1.5"
+            >
+              {isSubmitting ? 'Creating...' : 'Create Batch'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Edit Batch */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        title="Edit Poultry Batch"
+      >
+        <form onSubmit={handleEdit} className="space-y-4">
+          {modalError && (
+            <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+              <span>{modalError}</span>
             </div>
-          </form>
-        </Modal>
-      )}
+          )}
 
-      {/* Daily Batch Record Modal */}
-      {showDailyRecordModal && (
-        <Modal
-          isOpen={showDailyRecordModal}
-          onClose={() => setShowDailyRecordModal(false)}
-          title="Record Daily Telemetry"
-        >
-          <form onSubmit={handleDailyRecord} className="space-y-4">
-            <p className="text-xs text-[var(--text-muted)]">
-              Log daily mortality, feed consumption, and average bird weight. Database will automatically update alive count and growth telemetry.
-            </p>
-
-            <div className="grid grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Dead Chicks Today
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={dailyDead}
-                  onChange={(e) => setDailyDead(Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Feed Consumed (kg)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={dailyFeed}
-                  onChange={(e) => setDailyFeed(Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Avg Bird Weight (kg)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  step="0.05"
-                  value={dailyWeight}
-                  onChange={(e) => setDailyWeight(Number(e.target.value))}
-                  placeholder="e.g. 1.85"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
-                />
-              </div>
-            </div>
-
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Daily Observations / Notes
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Batch Number
               </label>
-              <textarea
-                rows={2}
-                value={dailyNotes}
-                onChange={(e) => setDailyNotes(e.target.value)}
-                placeholder="Water intake normal, temperature maintained at 30°C..."
+              <input
+                type="text"
+                required
+                value={form.batchNumber}
+                onChange={(e) => setForm({ ...form, batchNumber: e.target.value })}
                 className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
               />
             </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowDailyRecordModal(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Status
+              </label>
+              <select
+                value={form.status}
+                onChange={(e) => setForm({ ...form, status: e.target.value as any })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
               >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600 disabled:opacity-50"
-              >
-                {isSubmitting ? 'Saving...' : 'Record Daily Log'}
-              </button>
+                <option value="growing">Growing (Active)</option>
+                <option value="completed">Completed</option>
+                <option value="sold">Sold</option>
+              </select>
             </div>
-          </form>
-        </Modal>
-      )}
+          </div>
 
-      {/* 45-Day Poultry Growth & Vaccination Schedule Modal */}
-      {showScheduleModal && (
-        <Modal
-          isOpen={showScheduleModal}
-          onClose={() => setShowScheduleModal(false)}
-          title={`📅 45-Day Poultry Growth & Vaccination Protocol • ${selectedBatchForSchedule?.batchNumber || 'Active Batch'}`}
-          size="lg"
-        >
-          <FlockCalendar batch={selectedBatchForSchedule || undefined} />
-        </Modal>
-      )}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Total Chicks Placed
+              </label>
+              <input
+                type="number"
+                required
+                min="1"
+                value={form.totalChicks}
+                onChange={(e) => setForm({ ...form, totalChicks: Number(e.target.value) })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Dead Chicks (Mortality)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={form.deadChicks}
+                onChange={(e) => setForm({ ...form, deadChicks: Number(e.target.value) })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowEditModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center gap-1.5"
+            >
+              {isSubmitting ? 'Updating...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: Daily Log Record */}
+      <Modal
+        isOpen={showDailyRecordModal}
+        onClose={() => setShowDailyRecordModal(false)}
+        title="Add Daily Batch Log Entry"
+      >
+        <form onSubmit={handleDailyRecord} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Dead Chicks Today
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={dailyDead}
+                onChange={(e) => setDailyDead(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Feed Consumed (kg)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={dailyFeed}
+                onChange={(e) => setDailyFeed(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Avg Weight (kg)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={dailyWeight}
+                onChange={(e) => setDailyWeight(Number(e.target.value))}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+              Observation / Notes
+            </label>
+            <input
+              type="text"
+              placeholder="Flock active, water chlorination checked, litter dry..."
+              value={dailyNotes}
+              onChange={(e) => setDailyNotes(e.target.value)}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowDailyRecordModal(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center gap-1.5"
+            >
+              {isSubmitting ? 'Saving...' : 'Save Daily Entry'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Modal: 45-Day Vaccine Protocol */}
+      <Modal
+        isOpen={showScheduleModal}
+        onClose={() => setShowScheduleModal(false)}
+        title="45-Day Poultry Health & Vaccine Schedule"
+        size="lg"
+      >
+        <FlockCalendar batch={selectedBatchForSchedule || undefined} />
+      </Modal>
     </div>
   );
 }

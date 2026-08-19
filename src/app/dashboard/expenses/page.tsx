@@ -39,6 +39,7 @@ export default function ExpensesPage() {
     batches,
     settings,
     theme,
+    syncAll,
   } = useFarmStore();
 
   const [activeCategory, setActiveCategory] = useState('All');
@@ -48,19 +49,25 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false);
 
   const isLiquid = theme === 'obsidian' || theme === 'liquid-glass' || theme === 'liquid';
-  const currency = settings.currency || '₹';
+  const currency = settings?.currency || '₹';
 
   useEffect(() => {
     fetchExpenses();
-  }, [fetchExpenses]);
+    syncAll();
+  }, [fetchExpenses, syncAll]);
 
-  const filteredExpenses = expenses.filter((e) => {
-    const matchesCat = activeCategory === 'All' || e.category.toLowerCase() === activeCategory.toLowerCase();
+  const safeExpenses = Array.isArray(expenses) ? expenses : [];
+  const safeBatches = Array.isArray(batches) ? batches : [];
+
+  const filteredExpenses = safeExpenses.filter((e) => {
+    if (!e) return false;
+    const cat = e.category || '';
+    const matchesCat = activeCategory === 'All' || cat.toLowerCase() === activeCategory.toLowerCase();
     const matchesBatch = selectedBatchFilter === 'all' || e.batchId === selectedBatchFilter;
     return matchesCat && matchesBatch;
   });
 
-  const totalFilteredAmount = filteredExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalFilteredAmount = filteredExpenses.reduce((sum, e) => sum + (e?.amount || 0), 0);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -77,11 +84,19 @@ export default function ExpensesPage() {
     if (res.success) {
       setIsModalOpen(false);
       setForm(emptyExpense);
+      await syncAll();
     }
   };
 
-  const getCategoryIcon = (category: string) => {
-    const cat = category.toLowerCase();
+  const handleDeleteExpense = async (id: string) => {
+    if (confirm('Are you sure you want to delete this expense?')) {
+      await deleteExpense(id);
+      await syncAll();
+    }
+  };
+
+  const getCategoryIcon = (category?: string) => {
+    const cat = (category || '').toLowerCase();
     if (cat.includes('feed') || cat.includes('food')) return <Wheat className="w-4 h-4 text-amber-400" />;
     if (cat.includes('med') || cat.includes('vacc')) return <Pill className="w-4 h-4 text-violet-400" />;
     if (cat.includes('elec') || cat.includes('power')) return <Zap className="w-4 h-4 text-cyan-400" />;
@@ -93,18 +108,26 @@ export default function ExpensesPage() {
   const exportCSV = () => {
     if (filteredExpenses.length === 0) return;
     const headers = ['Category', 'Description', 'Amount (₹)', 'Date', 'Batch'];
-    const rows = filteredExpenses.map((e) => [
-      e.category,
-      `"${(e.description || '').replace(/"/g, '""')}"`,
-      e.amount,
-      new Date(e.date).toLocaleDateString(),
-      e.batch?.batchNumber || 'General',
-    ]);
+    const rows = filteredExpenses.map((e) => {
+      const batchObj = safeBatches.find((b) => b?.id === e.batchId);
+      const safeDate = e.date ? new Date(e.date).toLocaleDateString() : '—';
+      return [
+        e.category || 'General',
+        `"${(e.description || '').replace(/"/g, '""')}"`,
+        e.amount || 0,
+        safeDate,
+        batchObj ? batchObj.batchNumber : 'General Farm',
+      ];
+    });
+
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
-    link.href = encodeURI(csvContent);
-    link.download = `chickfarm_expenses_${new Date().toISOString().split('T')[0]}.csv`;
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `farm_expenses_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
     link.click();
+    document.body.removeChild(link);
   };
 
   return (
@@ -113,290 +136,258 @@ export default function ExpensesPage() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">
-            Expense Management
+            Expenditure & Feed Ledger
           </h1>
           <p className="text-[var(--text-secondary)] text-sm mt-0.5">
-            Log and audit all production costs with automatic category summaries
+            Track feed purchases, medications, electricity units, and farm maintenance
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
-          {filteredExpenses.length > 0 && (
-            <button
-              onClick={exportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] text-xs font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)]"
-            >
-              <Download className="w-3.5 h-3.5" />
-              Export
-            </button>
-          )}
-
+        <div className="flex items-center gap-2.5">
           <button
-            onClick={() => {
-              setForm(emptyExpense);
-              setIsModalOpen(true);
-            }}
-            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-semibold text-white transition-all shadow-md ${
+            onClick={exportCSV}
+            className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold text-[var(--text-secondary)] bg-[var(--bg-card)] border border-[var(--border-color)] hover:bg-[var(--bg-card-hover)] transition-all cursor-pointer"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-xs sm:text-sm font-semibold text-white transition-all shadow-md active:scale-95 cursor-pointer ${
               isLiquid
-                ? 'bg-gradient-to-r from-violet-600 to-cyan-600 hover:opacity-90 shadow-violet-500/20'
+                ? 'bg-gradient-to-r from-violet-600 via-cyan-600 to-emerald-500 hover:opacity-90 shadow-violet-500/20'
                 : 'bg-emerald-500 hover:bg-emerald-600 shadow-emerald-500/20'
             }`}
           >
             <Plus className="w-4 h-4" />
-            <span>Record Expense</span>
+            <span>Add Expense</span>
           </button>
         </div>
       </div>
 
-      {/* Overview Metric Banner */}
-      <div
-        className={`p-6 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
-          isLiquid ? 'liquid-panel' : 'shadow-sm'
-        }`}
-      >
-        <div>
-          <span className="text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider block mb-1">
-            Total Filtered Expenditures ({activeCategory})
-          </span>
-          <div className="text-3xl sm:text-4xl font-extrabold text-[var(--text-primary)]">
-            {currency} {totalFilteredAmount.toLocaleString('en-IN')}
-          </div>
-          <p className="text-xs text-[var(--text-secondary)] mt-1">
-            {filteredExpenses.length} recorded item{filteredExpenses.length === 1 ? '' : 's'}
-          </p>
+      {/* Category Pills & Batch Filter */}
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full md:w-auto py-1">
+          {CATEGORIES.map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setActiveCategory(cat)}
+              className={`px-3.5 py-2 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                activeCategory === cat
+                  ? isLiquid
+                    ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
+                    : 'bg-emerald-500 text-white'
+                  : 'bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-secondary)] hover:bg-[var(--bg-card-hover)]'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 w-full md:w-auto justify-end">
           <select
             value={selectedBatchFilter}
             onChange={(e) => setSelectedBatchFilter(e.target.value)}
-            className="px-3.5 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-[var(--bg-card)] border border-[var(--border-color)] text-[var(--text-primary)] focus:outline-none"
           >
             <option value="all">All Batches</option>
-            {batches.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.batchNumber} ({b.batchName || b.breedType})
+            {safeBatches.map((b) => (
+              <option key={b?.id || Math.random()} value={b?.id}>
+                {b?.batchNumber} ({b?.breedType})
               </option>
             ))}
           </select>
         </div>
       </div>
 
-      {/* Category Filter Pills */}
-      <div className="flex flex-wrap gap-2">
-        {CATEGORIES.map((cat) => (
-          <button
-            key={cat}
-            onClick={() => setActiveCategory(cat)}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-              activeCategory === cat
-                ? isLiquid
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/30'
-                  : 'bg-emerald-500 text-white'
-                : 'bg-[var(--bg-card)] text-[var(--text-secondary)] border border-[var(--border-color)] hover:text-[var(--text-primary)]'
-            }`}
-          >
-            {cat}
-          </button>
-        ))}
-      </div>
-
-      {/* Expense Items List */}
-      {filteredExpenses.length === 0 ? (
-        <div
-          className={`p-12 text-center rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
-            isLiquid ? 'liquid-panel' : ''
-          }`}
-        >
-          <Wallet className="w-12 h-12 mx-auto text-[var(--text-muted)] opacity-40 mb-3" />
-          <h3 className="text-base font-semibold text-[var(--text-primary)]">No expense records found</h3>
-          <p className="text-xs text-[var(--text-muted)] mt-1">
-            Record a new expense to track farm production costs.
-          </p>
-        </div>
-      ) : (
-        <div
-          className={`rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden ${
-            isLiquid ? 'liquid-panel' : 'shadow-sm'
-          }`}
-        >
-          <div className="divide-y divide-[var(--border-color)]">
-            {filteredExpenses.map((expense) => {
-              const formattedDate = new Date(expense.date).toLocaleDateString('en-IN', {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
-              });
-
-              return (
-                <div
-                  key={expense.id}
-                  className={`p-4 sm:p-5 flex items-center justify-between gap-4 transition-colors ${
-                    isLiquid ? 'hover:bg-white/[0.02]' : 'hover:bg-[var(--bg-card-hover)]'
-                  }`}
-                >
-                  <div className="flex items-center gap-3.5 min-w-0">
-                    <div
-                      className={`w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0 ${
-                        isLiquid ? 'bg-white/[0.04]' : 'bg-[var(--bg-input)]'
-                      }`}
-                    >
-                      {getCategoryIcon(expense.category)}
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-[var(--text-primary)] truncate">
-                          {expense.description}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[var(--bg-input)] text-[var(--text-secondary)]">
-                          {expense.category}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-3 text-xs text-[var(--text-muted)] mt-0.5">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3" />
-                          {formattedDate}
-                        </span>
-                        {expense.batch && (
-                          <span className="flex items-center gap-1 text-emerald-400 font-medium">
-                            <Layers className="w-3 h-3" />
-                            {expense.batch.batchNumber}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <span className="text-base font-bold text-rose-400 whitespace-nowrap">
-                      - {currency} {expense.amount.toLocaleString('en-IN')}
-                    </span>
-                    <button
-                      onClick={() => {
-                        if (confirm('Delete this expense record?')) {
-                          deleteExpense(expense.id);
-                        }
-                      }}
-                      className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                      title="Delete expense"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
+      {/* Total Filtered Summary Card */}
+      <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-color)] flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div>
+            <span className="text-xs text-[var(--text-muted)] font-medium">
+              Filtered Total Expenditure ({filteredExpenses.length} entries)
+            </span>
+            <div className="text-xl sm:text-2xl font-black text-[var(--text-primary)] mt-0.5">
+              {currency} {totalFilteredAmount.toLocaleString('en-IN')}
+            </div>
           </div>
         </div>
-      )}
+      </div>
 
-      {/* Record Expense Modal */}
-      {isModalOpen && (
-        <Modal
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          title="Record Farm Expense"
-        >
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Category *
-                </label>
-                <select
-                  value={form.category}
-                  onChange={(e) => setForm({ ...form, category: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
-                >
-                  <option value="Feed">Feed</option>
-                  <option value="Medicine">Medicine & Vaccines</option>
-                  <option value="Electricity">Electricity</option>
-                  <option value="Labour">Labour & Wages</option>
-                  <option value="Maintenance">Maintenance & Repairs</option>
-                  <option value="Miscellaneous">Miscellaneous</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Amount (₹) *
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  step="0.01"
-                  required
-                  value={form.amount}
-                  onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                  placeholder="e.g. 15000"
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
-                />
-              </div>
-            </div>
+      {/* Expenses Table */}
+      <div className="rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] overflow-hidden shadow-sm">
+        {filteredExpenses.length === 0 ? (
+          <div className="p-12 text-center">
+            <Wallet className="w-12 h-12 mx-auto text-[var(--text-muted)] opacity-40 mb-3" />
+            <h3 className="text-base font-semibold text-[var(--text-primary)]">No Expenses Recorded</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">
+              Add your feed invoices, vaccines, electricity bills, or farm repairs to see live cost breakdowns.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[var(--bg-input)]/50 border-b border-[var(--border-color)] text-[var(--text-muted)] uppercase tracking-wider font-bold">
+                <tr>
+                  <th className="py-3.5 px-4">Category</th>
+                  <th className="py-3.5 px-4">Description</th>
+                  <th className="py-3.5 px-4">Batch</th>
+                  <th className="py-3.5 px-4">Date</th>
+                  <th className="py-3.5 px-4 text-right">Amount</th>
+                  <th className="py-3.5 px-4 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--border-color)]">
+                {filteredExpenses.map((exp) => {
+                  const bObj = safeBatches.find((b) => b?.id === exp.batchId);
+                  const safeDate = exp.date ? new Date(exp.date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
+                  return (
+                    <tr key={exp.id} className="hover:bg-[var(--bg-input)]/30 transition-colors">
+                      <td className="py-3.5 px-4 font-semibold text-[var(--text-primary)]">
+                        <div className="flex items-center gap-2">
+                          {getCategoryIcon(exp.category)}
+                          <span>{exp.category || 'General'}</span>
+                        </div>
+                      </td>
+                      <td className="py-3.5 px-4 text-[var(--text-secondary)] font-medium max-w-xs truncate">
+                        {exp.description || '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-[var(--text-muted)] font-mono text-[11px]">
+                        {bObj ? bObj.batchNumber : 'General Farm'}
+                      </td>
+                      <td className="py-3.5 px-4 text-[var(--text-muted)] whitespace-nowrap">
+                        {safeDate}
+                      </td>
+                      <td className="py-3.5 px-4 text-right font-bold text-rose-400 whitespace-nowrap">
+                        - {currency} {(exp.amount || 0).toLocaleString('en-IN')}
+                      </td>
+                      <td className="py-3.5 px-4 text-center">
+                        <button
+                          onClick={() => handleDeleteExpense(exp.id)}
+                          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                          title="Delete Expense"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Modal: Add Expense */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title="Record Farm Expense"
+      >
+        <form onSubmit={handleSave} className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+              Category *
+            </label>
+            <select
+              value={form.category}
+              onChange={(e) => setForm({ ...form, category: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+            >
+              <option value="Feed">Feed (Broiler Starter / Finisher)</option>
+              <option value="Medicine">Medicine & Vaccines</option>
+              <option value="Electricity">Electricity & Energy</option>
+              <option value="Labour">Labour & Staff Wages</option>
+              <option value="Maintenance">Maintenance & Repairs</option>
+              <option value="Miscellaneous">Miscellaneous</option>
+            </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                Description *
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Amount (₹) *
               </label>
               <input
-                type="text"
+                type="number"
                 required
-                value={form.description}
-                onChange={(e) => setForm({ ...form, description: e.target.value })}
-                placeholder="e.g. Brooder Heating Gas & Nipple Line Disinfectant"
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
+                min="1"
+                placeholder="e.g. 15000"
+                value={form.amount}
+                onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
               />
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={form.date}
-                  onChange={(e) => setForm({ ...form, date: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1">
-                  Associated Batch
-                </label>
-                <select
-                  value={form.batchId}
-                  onChange={(e) => setForm({ ...form, batchId: e.target.value })}
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)]"
-                >
-                  <option value="">-- General Farm Expense --</option>
-                  {batches.map((b) => (
-                    <option key={b.id} value={b.id}>
-                      {b.batchNumber} - {b.batchName || b.breedType}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div>
+              <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+                Date *
+              </label>
+              <input
+                type="date"
+                required
+                value={form.date}
+                onChange={(e) => setForm({ ...form, date: e.target.value })}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+              />
             </div>
+          </div>
 
-            <div className="flex justify-end gap-2 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsModalOpen(false)}
-                className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-5 py-2 rounded-xl text-xs font-semibold text-white bg-emerald-500 hover:bg-emerald-600"
-              >
-                {saving ? 'Saving...' : 'Save Expense'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+              Allocate to Batch (Optional)
+            </label>
+            <select
+              value={form.batchId}
+              onChange={(e) => setForm({ ...form, batchId: e.target.value })}
+              className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+            >
+              <option value="">General Farm Cost (Not tied to specific batch)</option>
+              {safeBatches.map((b) => (
+                <option key={b?.id || Math.random()} value={b?.id}>
+                  {b?.batchNumber} ({b?.breedType})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-[var(--text-muted)] block mb-1">
+              Description / Vendor / Item Details *
+            </label>
+            <textarea
+              rows={2}
+              required
+              placeholder="e.g. 50 bags Pre-starter feed from Godrej Agrovet..."
+              value={form.description}
+              onChange={(e) => setForm({ ...form, description: e.target.value })}
+              className="w-full px-3.5 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-color)] text-xs text-[var(--text-primary)] focus:outline-none"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2 pt-2">
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(false)}
+              className="px-4 py-2 rounded-xl text-xs font-semibold text-[var(--text-secondary)] hover:bg-[var(--bg-input)]"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={saving}
+              className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-emerald-500 hover:bg-emerald-600 shadow-md transition-all flex items-center gap-1.5"
+            >
+              {saving ? 'Saving...' : 'Save Expense'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }
