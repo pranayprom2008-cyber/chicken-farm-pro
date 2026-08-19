@@ -1,0 +1,13 @@
+name = "chicken-farm-pro-worker"
+main = "src/index.ts"
+compatibility_date = "2024-11-01"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+ENVIRONMENT = "production"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "chicken-farm-pro-d1"
+database_id = "d1-chicken-farm-prod-db-id"
+migrations_dir = "../d1"
