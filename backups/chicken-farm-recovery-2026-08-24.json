@@ -1,0 +1,101 @@
+{
+  "recoveryTimestamp": "2026-08-24T14:18:41.582Z",
+  "version": "1.0.0-RECOVERY",
+  "auditStatus": "VERIFIED_READ_ONLY",
+  "sourcesExamined": [
+    "SQLite dev.db (Batch, BillingCalculation, Farm, Setting, ActivityLog)",
+    "backups/farm_backup_latest.json",
+    "backups/farm_backup_1787163948418.json",
+    "Git Commit 7ddc1dce69004a81eaee60b56561be5317df80e2",
+    "Git Commit 01047c72e5fd82d6d9a04c9a68367545606c30dd"
+  ],
+  "summary": {
+    "totalBatchesFound": 1,
+    "totalBillingCalculationsFound": 1,
+    "totalExpensesFound": 0,
+    "totalSalesFound": 0,
+    "totalDailyRecordsFound": 0,
+    "totalFarmsFound": 1,
+    "totalUsersFound": 2
+  },
+  "recoveredData": {
+    "farm": {
+      "id": "farm-1",
+      "farmName": "GreenField Bio-Secure Poultry Farm",
+      "location": "Hyderabad, Telangana, India",
+      "ownerName": "Venkata Farms",
+      "phone": "9502828293",
+      "createdAt": "2026-08-16T09:52:30.648Z",
+      "updatedAt": "2026-08-16T09:52:30.648Z"
+    },
+    "users": [
+      {
+        "id": "user_john",
+        "farm_id": "farm_main",
+        "name": "John (Farm Lead)",
+        "phone": "9502828293",
+        "role": "Admin",
+        "pin": "1234",
+        "created_at": "2026-08-19 18:34:07",
+        "updated_at": "2026-08-19 18:34:07"
+      },
+      {
+        "id": "user_pranay",
+        "farm_id": "farm_main",
+        "name": "Pranay (Co-Founder)",
+        "phone": "9849852085",
+        "role": "Admin",
+        "pin": "1234",
+        "created_at": "2026-08-19 18:34:07",
+        "updated_at": "2026-08-19 18:34:07"
+      }
+    ],
+    "batches": [
+      {
+        "id": "cmsvnoyxk000f7dwn6aaisw0t",
+        "batchNumber": "B-2026-01",
+        "batchName": "Flock 1",
+        "breedType": "Cobb 500 (Broiler)",
+        "startDate": "2026-08-16T00:00:00.000Z",
+        "expectedEndDate": "2026-09-30T00:00:00.000Z",
+        "actualEndDate": null,
+        "durationDays": 45,
+        "totalChicks": 5000,
+        "aliveChicks": 5000,
+        "deadChicks": 0,
+        "mortalityPercentage": 0,
+        "status": "growing",
+        "notes": "Test Flock",
+        "createdAt": "2026-08-16T10:22:43.160Z",
+        "updatedAt": "2026-08-16T10:22:43.160Z"
+      }
+    ],
+    "billing": [
+      {
+        "id": "cmsvns8r0000k7dwn5cixnao6",
+        "batchId": null,
+        "type": "chick_purchase",
+        "chickRate": 222,
+        "numberOfChicks": 15,
+        "feedBags": null,
+        "fcrScore": null,
+        "totalAmount": 3330,
+        "notes": "Chick Purchase: 15 birds @ ₹222/unit",
+        "date": "2026-08-16T10:25:15.851Z",
+        "createdAt": "2026-08-16T10:25:15.852Z"
+      }
+    ],
+    "expenses": [],
+    "sales": [],
+    "dailyRecords": [],
+    "settings": {
+      "id": "default-setting",
+      "farmName": "GreenField Bio-Secure Poultry Farm",
+      "currency": "₹",
+      "language": "en",
+      "theme": "liquid",
+      "logoUrl": null,
+      "updatedAt": "2026-08-16T10:12:51.169Z"
+    }
+  }
+}

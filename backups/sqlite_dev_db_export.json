@@ -1,0 +1,163 @@
+{
+  "Farm": [
+    {
+      "id": "farm-1",
+      "farmName": "GreenField Bio-Secure Poultry Farm",
+      "location": "Hyderabad, Telangana, India",
+      "ownerName": "Venkata Farms",
+      "phone": "9502828293",
+      "createdAt": "2026-08-16T09:52:30.648Z",
+      "updatedAt": "2026-08-16T09:52:30.648Z"
+    }
+  ],
+  "Batch": [
+    {
+      "id": "cmsvnoyxk000f7dwn6aaisw0t",
+      "batchNumber": "B-2026-01",
+      "batchName": "Flock 1",
+      "breedType": "Cobb 500 (Broiler)",
+      "startDate": "2026-08-16T00:00:00.000Z",
+      "expectedEndDate": "2026-09-30T00:00:00.000Z",
+      "actualEndDate": null,
+      "durationDays": 45,
+      "totalChicks": 5000,
+      "aliveChicks": 5000,
+      "deadChicks": 0,
+      "status": "growing",
+      "notes": "Test Flock",
+      "createdAt": "2026-08-16T10:22:43.160Z",
+      "updatedAt": "2026-08-16T10:22:43.160Z"
+    }
+  ],
+  "DailyBatchRecord": [],
+  "Expense": [],
+  "Feed": [],
+  "Medicine": [],
+  "Labour": [],
+  "Electricity": [],
+  "Maintenance": [],
+  "Sales": [],
+  "BillingCalculation": [
+    {
+      "id": "cmsvns8r0000k7dwn5cixnao6",
+      "batchId": null,
+      "type": "chick_purchase",
+      "chickRate": 222,
+      "numberOfChicks": 15,
+      "feedBags": null,
+      "fcrScore": null,
+      "totalAmount": 3330,
+      "notes": "Chick Purchase: 15 birds @ ₹222/unit",
+      "date": "2026-08-16T10:25:15.851Z",
+      "createdAt": "2026-08-16T10:25:15.852Z"
+    }
+  ],
+  "Notification": [],
+  "Setting": [
+    {
+      "id": "default-setting",
+      "farmName": "GreenField Bio-Secure Poultry Farm",
+      "currency": "₹",
+      "language": "en",
+      "theme": "liquid",
+      "logoUrl": null,
+      "updatedAt": "2026-08-16T10:12:51.169Z"
+    }
+  ],
+  "ActivityLog": [
+    {
+      "id": "cmsvnoyy2000i7dwn35fqumfw",
+      "action": "CREATE_BATCH",
+      "details": "Created batch B-2026-01 with 5000 chicks",
+      "user": "Admin",
+      "createdAt": "2026-08-16T10:22:43.179Z"
+    },
+    {
+      "id": "cmsvns8rl000l7dwnn4v3bclv",
+      "action": "BILLING_CALCULATION_SAVED",
+      "details": "Saved chick_purchase calculation for ₹3,330",
+      "user": "Admin",
+      "createdAt": "2026-08-16T10:25:15.873Z"
+    }
+  ],
+  "farms": [
+    {
+      "id": "farm_main",
+      "farm_name": "GreenField Poultry Farm",
+      "location": "Hyderabad, India",
+      "owner_name": "John & Pranay",
+      "phone": "9502828293",
+      "created_at": "2026-08-19 18:34:07",
+      "updated_at": "2026-08-19 18:34:07"
+    }
+  ],
+  "users": [
+    {
+      "id": "user_john",
+      "farm_id": "farm_main",
+      "name": "John (Farm Lead)",
+      "phone": "9502828293",
+      "role": "Admin",
+      "pin": "1234",
+      "created_at": "2026-08-19 18:34:07",
+      "updated_at": "2026-08-19 18:34:07"
+    },
+    {
+      "id": "user_pranay",
+      "farm_id": "farm_main",
+      "name": "Pranay (Co-Founder)",
+      "phone": "9849852085",
+      "role": "Admin",
+      "pin": "1234",
+      "created_at": "2026-08-19 18:34:07",
+      "updated_at": "2026-08-19 18:34:07"
+    }
+  ],
+  "batches": [
+    {
+      "id": "cmsvnoyxk000f7dwn6aaisw0t",
+      "farm_id": "farm_main",
+      "batch_number": "B-2026-01",
+      "batch_name": "Flock 1",
+      "breed_type": "Cobb 500 (Broiler)",
+      "start_date": "2026-08-16T00:00:00.000Z",
+      "expected_end_date": "2026-09-30T00:00:00.000Z",
+      "actual_end_date": null,
+      "duration_days": 45,
+      "total_chicks": 5000,
+      "alive_chicks": 5000,
+      "dead_chicks": 0,
+      "mortality_percentage": 0,
+      "status": "growing",
+      "notes": "Test Flock",
+      "created_at": "2026-08-19 18:37:01",
+      "updated_at": "2026-08-19 18:37:01"
+    }
+  ],
+  "daily_records": [],
+  "expenses": [],
+  "billing": [
+    {
+      "id": "cmsvns8r0000k7dwn5cixnao6",
+      "farm_id": "farm_main",
+      "batch_id": null,
+      "flock_name": "chick_purchase",
+      "total_chicks": 15,
+      "alive_chicks": 15,
+      "total_weight_kg": 0,
+      "average_weight_kg": 0,
+      "price_per_kg": 222,
+      "gross_revenue": 3330,
+      "deductions": 0,
+      "total_amount": 3330,
+      "notes": "Chick Purchase: 15 birds @ ₹222/unit",
+      "date": "2026-08-16T10:25:15.851Z",
+      "created_at": "2026-08-19 18:37:01"
+    }
+  ],
+  "inventory": [],
+  "employees": [],
+  "notifications": [],
+  "settings": [],
+  "ai_actions": []
+}

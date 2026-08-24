@@ -1,36 +1,65 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { cloudDb } from '@/lib/cloudStore';
+import { d1 } from '@/lib/d1Client';
 
 export const dynamic = 'force-dynamic';
 
-// GET all batches
+// GET all batches from Cloudflare D1 / Database
 export async function GET() {
   try {
-    // 1. Cloud Database is Single Source of Truth
-    const cloudBatches = await cloudDb.get<any[]>('batches');
-    if (cloudBatches !== null && Array.isArray(cloudBatches)) {
-      return NextResponse.json(cloudBatches);
-    }
+    // 1. Fetch from D1 / Database
+    const batches = await prisma.batch.findMany({
+      include: {
+        dailyRecords: { orderBy: { date: 'asc' } },
+        expenses: true,
+        salesRecords: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
 
-    // 2. First-time initialization only (when key is totally uninitialized)
-    try {
-      const batches = await prisma.batch.findMany({
-        include: {
-          dailyRecords: { orderBy: { date: 'asc' } },
-          expenses: true,
-          salesRecords: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      });
-      const initialList = Array.isArray(batches) ? batches : [];
-      await cloudDb.saveBatches(initialList);
-      return NextResponse.json(initialList);
-    } catch {
-      await cloudDb.saveBatches([]);
-      return NextResponse.json([]);
-    }
+    const formatted = (batches || []).map((b) => {
+      const total = Number(b.totalChicks) || 5000;
+      const dead = Number(b.deadChicks) || 0;
+      const alive = Number(b.aliveChicks) || Math.max(0, total - dead);
+      const mortPct = total > 0 ? Number(((dead / total) * 100).toFixed(2)) : 0;
+      const duration = Number(b.durationDays) || 45;
+
+      const startDate = b.startDate ? new Date(b.startDate) : new Date();
+      const today = new Date();
+      const elapsed = Math.max(1, Math.min(duration, Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1));
+      const progress = Math.min(100, Math.max(1, Math.round((elapsed / duration) * 100)));
+
+      return {
+        id: b.id,
+        batchNumber: b.batchNumber,
+        batchName: b.batchName || `Batch ${b.batchNumber}`,
+        breedType: b.breedType || 'Cobb 500 (Broiler)',
+        startDate: b.startDate ? new Date(b.startDate).toISOString() : new Date().toISOString(),
+        expectedEndDate: b.expectedEndDate ? new Date(b.expectedEndDate).toISOString() : new Date().toISOString(),
+        actualEndDate: b.actualEndDate ? new Date(b.actualEndDate).toISOString() : null,
+        durationDays: duration,
+        totalChicks: total,
+        aliveChicks: alive,
+        deadChicks: dead,
+        mortalityPercentage: mortPct,
+        daysElapsed: elapsed,
+        daysRemaining: Math.max(0, duration - elapsed),
+        growthProgress: progress,
+        status: b.status || 'growing',
+        notes: b.notes || '',
+        totalExpenditure: 0,
+        costPerChick: 0,
+        totalRevenue: 0,
+        totalChickensSold: 0,
+        netProfit: 0,
+        profitPerChick: 0,
+        createdAt: b.createdAt ? new Date(b.createdAt).toISOString() : new Date().toISOString(),
+      };
+    });
+
+    return NextResponse.json(formatted);
   } catch (error: any) {
+    console.error('Error fetching batches:', error);
     return NextResponse.json([]);
   }
 }
@@ -60,69 +89,31 @@ export async function POST(req: Request) {
     const dead = Number(deadChicks) || 0;
     const alive = Math.max(0, total - dead);
     const duration = Number(durationDays) || 45;
-    const mortalityPct = total > 0 ? (dead / total) * 100 : 0;
 
     const start = startDate ? new Date(startDate) : new Date();
     const expectedEnd = expectedEndDate
       ? new Date(expectedEndDate)
       : new Date(start.getTime() + duration * 24 * 60 * 60 * 1000);
 
-    const newBatch = {
-      id: body.id || `BATCH-${Date.now()}`,
-      batchNumber: String(batchNumber).trim(),
-      batchName: batchName ? String(batchName).trim() : `Batch ${batchNumber}`,
-      breedType: breedType || 'Cobb 500 (Broiler)',
-      startDate: start.toISOString().split('T')[0],
-      expectedEndDate: expectedEnd.toISOString().split('T')[0],
-      actualEndDate: null,
-      durationDays: duration,
-      totalChicks: total,
-      aliveChicks: alive,
-      deadChicks: dead,
-      mortalityPercentage: Number(mortalityPct.toFixed(2)),
-      daysElapsed: 1,
-      daysRemaining: duration,
-      growthProgress: 2,
-      status: status || 'growing',
-      notes: notes || '',
-      totalExpenditure: 0,
-      costPerChick: 0,
-      totalRevenue: 0,
-      totalChickensSold: 0,
-      netProfit: 0,
-      profitPerChick: 0,
-      createdAt: new Date().toISOString(),
-    };
+    const created = await prisma.batch.create({
+      data: {
+        batchNumber: String(batchNumber).trim(),
+        batchName: batchName ? String(batchName).trim() : `Batch ${batchNumber}`,
+        breedType: breedType || 'Cobb 500 (Broiler)',
+        startDate: start,
+        expectedEndDate: expectedEnd,
+        durationDays: duration,
+        totalChicks: total,
+        aliveChicks: alive,
+        deadChicks: dead,
+        status: status || 'growing',
+        notes: notes || '',
+      },
+    });
 
-    // 1. Save directly to Cloud Database
-    const currentBatches = (await cloudDb.get<any[]>('batches')) || [];
-    const updatedBatches = [newBatch, ...currentBatches.filter((b) => b.id !== newBatch.id && b.batchNumber !== newBatch.batchNumber)];
-    await cloudDb.saveBatches(updatedBatches);
-
-    // 2. Background Prisma write
-    try {
-      await prisma.batch.create({
-        data: {
-          id: newBatch.id,
-          batchNumber: newBatch.batchNumber,
-          batchName: newBatch.batchName,
-          breedType: newBatch.breedType,
-          startDate: start,
-          expectedEndDate: expectedEnd,
-          durationDays: duration,
-          totalChicks: total,
-          aliveChicks: alive,
-          deadChicks: dead,
-          status: newBatch.status,
-          notes: newBatch.notes,
-        },
-      });
-    } catch {
-      // ignore
-    }
-
-    return NextResponse.json(newBatch, { status: 201 });
+    return NextResponse.json(created);
   } catch (error: any) {
+    console.error('Error creating batch:', error);
     return NextResponse.json({ error: error.message || 'Failed to create batch' }, { status: 500 });
   }
 }
