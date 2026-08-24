@@ -140,7 +140,7 @@ export default function SaleInvoiceModal({ isOpen, onClose, sale }: SaleInvoiceM
           <div className="flex justify-between items-end pt-2">
             <div className="text-xs text-slate-500 space-y-1">
               <p>• Notes: {sale.notes || 'Full payment settled upon vehicle dispatch.'}</p>
-              <p>• Authorized Signatories: <strong>John (Owner)</strong> & <strong>Pranay (Tech & Operations)</strong></p>
+              <p>• Authorized Signatory: <strong>{useFarmStore.getState().user?.name || 'Farm Owner'}</strong> ({useFarmStore.getState().user?.role || 'Farm Lead'})</p>
             </div>
 
             <div className="text-right p-4 rounded-2xl bg-emerald-50 border border-emerald-200 min-w-48">

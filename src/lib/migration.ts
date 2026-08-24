@@ -78,8 +78,8 @@ export async function runSafeD1Migration(): Promise<MigrationReport> {
         id TEXT PRIMARY KEY,
         farm_name TEXT NOT NULL DEFAULT 'GreenField Poultry Farm',
         location TEXT NOT NULL DEFAULT 'Hyderabad, India',
-        owner_name TEXT NOT NULL DEFAULT 'John & Pranay',
-        phone TEXT NOT NULL DEFAULT '9502828293',
+        owner_name TEXT NOT NULL DEFAULT 'Farm Owner',
+        phone TEXT NOT NULL DEFAULT '',
         created_at TEXT NOT NULL DEFAULT (datetime('now')),
         updated_at TEXT NOT NULL DEFAULT (datetime('now'))
       )`,
@@ -238,8 +238,8 @@ export async function runSafeD1Migration(): Promise<MigrationReport> {
       farmId,
       backupData.farm?.farmName || 'GreenField Poultry Farm',
       backupData.farm?.location || 'Hyderabad, India',
-      backupData.farm?.ownerName || 'John & Pranay',
-      backupData.farm?.phone || '9502828293',
+      backupData.farm?.ownerName || 'Farm Owner',
+      backupData.farm?.phone || '',
     ]);
 
     for (const u of backupData.users || []) {

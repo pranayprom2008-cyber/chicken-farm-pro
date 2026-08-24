@@ -103,10 +103,10 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Authorized Farm Administrators (Strict 2 Admins) */}
+      {/* Active Farm Manager / Operator */}
       <div className="space-y-3">
         <h2 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-wider">
-          Authorized System Administrators (Exclusive Access)
+          Active Farm Leadership & Workforce
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <TiltCard maxTilt={8} glare={true}>
@@ -117,23 +117,27 @@ export default function EmployeesPage() {
             >
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center font-black text-lg">
-                    J
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center font-black text-lg">
+                    {useFarmStore.getState().user?.name ? useFarmStore.getState().user!.name[0].toUpperCase() : 'F'}
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-extrabold text-[var(--text-primary)]">John</h3>
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        Farm Owner
+                      <h3 className="text-base font-extrabold text-[var(--text-primary)]">
+                        {useFarmStore.getState().user?.name || 'Farm Owner'}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                        {useFarmStore.getState().user?.role || 'Farm Lead'}
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Primary Administrator & Founder</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Primary Farm Administrator</p>
                   </div>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
-                <span className="text-[var(--text-muted)] font-medium">Auth Phone:</span>
-                <span className="font-bold text-[var(--text-primary)] tracking-wide">+91 9502828293</span>
+                <span className="text-[var(--text-muted)] font-medium">Cloud Identity:</span>
+                <span className="font-bold text-[var(--text-primary)] tracking-wide">
+                  {useFarmStore.getState().user?.email || 'Authenticated Cloud Account'}
+                </span>
               </div>
             </div>
           </TiltCard>
@@ -147,22 +151,24 @@ export default function EmployeesPage() {
               <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                   <div className="w-12 h-12 rounded-2xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-black text-lg">
-                    P
+                    <Users className="w-6 h-6" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <h3 className="text-base font-extrabold text-[var(--text-primary)]">Pranay</h3>
+                      <h3 className="text-base font-extrabold text-[var(--text-primary)]">Farm Workforce</h3>
                       <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                        Manager & Tech Lead
+                        Active Staff
                       </span>
                     </div>
-                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Operations & Technical Architect</p>
+                    <p className="text-xs text-[var(--text-secondary)] mt-0.5">Attendants, Shed Labour & Feed Handlers</p>
                   </div>
                 </div>
               </div>
               <div className="mt-4 pt-3 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
-                <span className="text-[var(--text-muted)] font-medium">Auth Phone:</span>
-                <span className="font-bold text-[var(--text-primary)] tracking-wide">+91 9849852085</span>
+                <span className="text-[var(--text-muted)] font-medium">Logged Staff Members:</span>
+                <span className="font-bold text-[var(--text-primary)] tracking-wide">
+                  {new Set(labourLogs.map((l) => l.employeeName)).size} Farm Workers
+                </span>
               </div>
             </div>
           </TiltCard>

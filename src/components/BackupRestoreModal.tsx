@@ -173,7 +173,7 @@ export default function BackupRestoreModal({ isOpen, onClose }: BackupRestoreMod
         <div className="pt-2 border-t border-[var(--border-color)] flex items-center justify-between text-[11px] text-[var(--text-muted)]">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>Authorized: <strong>John & Pranay</strong></span>
+            <span>Authorized: <strong>{store.user?.name || 'Farm Owner'}</strong></span>
           </div>
           <span>Automatic Local Cache Active</span>
         </div>

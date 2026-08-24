@@ -47,9 +47,8 @@ export default function WhatsAppReportModal({ isOpen, onClose }: WhatsAppReportM
 • Total Farm Expenses: *₹ ${totalExp.toLocaleString('en-IN')}*
 • Realized Net Profit: *₹ ${netProfit.toLocaleString('en-IN')}*
 
-👑 *Authorized Farm Admins:*
-• Owner: *John (9502828293)*
-• Manager & Tech: *Pranay (9849852085)*
+👤 *Report Prepared By:*
+• Farmer: *${useFarmStore.getState().user?.name || 'Farm Owner'} (${useFarmStore.getState().user?.role || 'Farm Lead'})*
 ────────────────────────
 Generated via *ChickFarm Pro Commercial OS*`;
 
@@ -82,24 +81,24 @@ Generated via *ChickFarm Pro Commercial OS*`;
         {/* Quick Send Options */}
         <div className="space-y-2.5">
           <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-muted)] block">
-            Direct Dispatch to Authorized Admins
+            Dispatch Options
           </span>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
             <button
-              onClick={() => openWhatsApp('9502828293')}
+              onClick={() => openWhatsApp()}
               className="px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
             >
               <Send className="w-4 h-4" />
-              <span>Send to John (Owner)</span>
+              <span>Share via WhatsApp</span>
             </button>
 
             <button
-              onClick={() => openWhatsApp('9849852085')}
-              className="px-4 py-3 rounded-2xl bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-teal-600/25 transition-all cursor-pointer"
+              onClick={handleCopy}
+              className="px-4 py-3 rounded-2xl bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] border border-[var(--border-color)] text-[var(--text-primary)] font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer"
             >
-              <Send className="w-4 h-4" />
-              <span>Send to Pranay (Tech)</span>
+              {copied ? <Check className="w-4 h-4 text-emerald-400" /> : <Copy className="w-4 h-4" />}
+              <span>{copied ? 'Copied to Clipboard!' : 'Copy Report'}</span>
             </button>
           </div>
 

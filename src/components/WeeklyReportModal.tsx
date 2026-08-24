@@ -16,7 +16,6 @@ export default function WeeklyReportModal({ isOpen, onClose }: WeeklyReportModal
   const [downloaded, setDownloaded] = useState(false);
 
   const activeBatch = batches.find((b) => b.status === 'growing') || batches[0];
-  const targetPhone = '9849852085'; // Strictly locked to Pranay
 
   const today = new Date();
   const weekStart = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -38,11 +37,11 @@ export default function WeeklyReportModal({ isOpen, onClose }: WeeklyReportModal
   const totalWeeklyRev = weeklySales.reduce((sum, s) => sum + s.totalRevenue, 0) || 0;
   const netWeeklyProfit = totalWeeklyRev > 0 ? (totalWeeklyRev - totalWeeklyExp) : 0;
 
-  // Pre-formatted WhatsApp Message strictly for 9849852085
+  // Pre-formatted WhatsApp Message
   const weeklyWhatsAppMessage = `📊 *${settings.farmName || 'Greenfield Poultry Farm'}*
 📈 *WEEKLY AUDIT & PERFORMANCE REPORT*
 📅 *Period: ${weekStartStr} - ${todayStr}*
-🎯 *Recipient: Pranay (Manager & Tech Lead • +91 ${targetPhone})*
+🎯 *Generated For: ${useFarmStore.getState().user?.name || 'Farm Owner'} (${useFarmStore.getState().user?.role || 'Farm Lead'})*
 ────────────────────────
 🐔 *Flock Biometrics (7-Day Overview):*
 • Active Batch: *${activeBatch?.batchNumber || 'Batch-01'} (${activeBatch?.breedType || 'Broiler Cobb 500'})*
@@ -68,7 +67,7 @@ ${totalWeeklyRev > 0 ? `• 7-Day Net Profit: *₹ ${netWeeklyProfit.toLocaleStr
     const csvRows = [
       ['GREENFIELD POULTRY FARM - WEEKLY AUDIT REPORT'],
       ['Period', `${weekStartStr} to ${todayStr}`],
-      ['Generated For', `Pranay (+91 ${targetPhone})`],
+      ['Generated For', `${useFarmStore.getState().user?.name || 'Farm Owner'}`],
       ['Batch Number', activeBatch?.batchNumber || 'Batch-01'],
       ['Breed Type', activeBatch?.breedType || 'Broiler Cobb 500'],
       [''],
@@ -103,26 +102,26 @@ ${totalWeeklyRev > 0 ? `• 7-Day Net Profit: *₹ ${netWeeklyProfit.toLocaleStr
     setTimeout(() => setDownloaded(false), 3000);
   };
 
-  const openWhatsAppPranay = () => {
+  const openWhatsAppReport = () => {
     const encoded = encodeURIComponent(weeklyWhatsAppMessage);
-    const url = `https://wa.me/91${targetPhone}?text=${encoded}`;
+    const url = `https://wa.me/?text=${encoded}`;
     window.open(url, '_blank');
   };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="📊 ChickAI Weekly Report & Excel Dispatch" size="md">
       <div className="space-y-5">
-        {/* Recipient banner strictly locked to 9849852085 */}
+        {/* Recipient banner */}
         <div className="p-3.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <ShieldCheck className="w-5 h-5 text-emerald-400" />
             <div>
-              <span className="text-xs font-bold text-emerald-300 block">Strict Authorized Recipient</span>
-              <span className="text-[11px] text-[var(--text-secondary)]">Pranay (Manager & Tech Lead)</span>
+              <span className="text-xs font-bold text-emerald-300 block">Weekly Dispatch Prepared</span>
+              <span className="text-[11px] text-[var(--text-secondary)]">{useFarmStore.getState().user?.name || 'Farm Owner'}</span>
             </div>
           </div>
           <span className="px-2.5 py-1 rounded-xl bg-emerald-500/20 text-emerald-400 font-mono font-bold text-xs border border-emerald-500/40">
-            +91 9849852085
+            {useFarmStore.getState().user?.role || 'Farm Lead'}
           </span>
         </div>
 
@@ -155,11 +154,11 @@ ${totalWeeklyRev > 0 ? `• 7-Day Net Profit: *₹ ${netWeeklyProfit.toLocaleStr
         {/* Action Buttons */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
           <button
-            onClick={openWhatsAppPranay}
+            onClick={openWhatsAppReport}
             className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
           >
             <Send className="w-4 h-4" />
-            <span>Send to 9849852085 (WhatsApp)</span>
+            <span>Share via WhatsApp</span>
           </button>
 
           <button

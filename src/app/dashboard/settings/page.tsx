@@ -297,7 +297,7 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Authorized Farm Administrators (Exclusive Access) */}
+      {/* Current Authenticated User Profile */}
       <TiltCard maxTilt={8} glare={true}>
         <div
           className={`p-6 sm:p-8 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] ${
@@ -306,44 +306,51 @@ export default function SettingsPage() {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-base font-bold text-[var(--text-primary)] flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              Authorized Farm Administrators
+              <UserCheck className="w-5 h-5 text-emerald-400" />
+              Farmer Profile & Identity
             </h2>
             <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Strict 2-Admin Access
+              Active User
             </span>
           </div>
           <p className="text-xs text-[var(--text-muted)] mb-5">
-            System security is hard-locked to the following two verified phone administrator accounts:
+            Configure your personal display name and farm identity. Your profile is automatically linked to your authenticated cloud account.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-input)] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-500 flex items-center justify-center font-extrabold text-sm">
-                  J
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--text-primary)]">John</h3>
-                  <span className="text-xs text-amber-400 font-semibold block">Farm Owner</span>
-                </div>
-              </div>
-              <span className="text-xs font-mono font-bold text-[var(--text-secondary)]">+91 9502828293</span>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+                Your Full Name
+              </label>
+              <input
+                type="text"
+                value={user?.name || ''}
+                onChange={(e) => useFarmStore.getState().updateUserProfile(e.target.value)}
+                placeholder="Enter your name"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500"
+              />
             </div>
 
-            <div className="p-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-input)] flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center font-extrabold text-sm">
-                  P
-                </div>
-                <div>
-                  <h3 className="text-sm font-bold text-[var(--text-primary)]">Pranay</h3>
-                  <span className="text-xs text-cyan-400 font-semibold block">Manager & Tech Lead</span>
-                </div>
-              </div>
-              <span className="text-xs font-mono font-bold text-[var(--text-secondary)]">+91 9849852085</span>
+            <div>
+              <label className="block text-xs font-semibold text-[var(--text-secondary)] mb-1.5">
+                Role / Title
+              </label>
+              <input
+                type="text"
+                value={user?.role || 'Farm Owner'}
+                onChange={(e) => useFarmStore.getState().updateUserProfile(user?.name || '', e.target.value)}
+                placeholder="e.g. Farm Owner, Lead Agronomist, Manager"
+                className="w-full px-4 py-2.5 rounded-xl border border-[var(--border-color)] bg-[var(--bg-input)] text-xs text-[var(--text-primary)] focus:outline-none focus:border-emerald-500"
+              />
             </div>
           </div>
+
+          {user?.email && (
+            <div className="mt-4 pt-4 border-t border-[var(--border-color)] flex items-center justify-between text-xs">
+              <span className="text-[var(--text-muted)]">Authenticated Account:</span>
+              <span className="font-mono font-bold text-emerald-400">{user.email}</span>
+            </div>
+          )}
         </div>
       </TiltCard>
 

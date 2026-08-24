@@ -229,11 +229,11 @@ export default function HomePage() {
                 </div>
               </div>
 
-              {/* Administrator Details */}
+              {/* Multi-Tenant Security Details */}
               <div className="mt-6 pt-4 border-t border-[var(--border-color)] flex flex-wrap items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
                 <div className="flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>Authorized Administrators: <strong>John (Owner)</strong> & <strong>Pranay (Manager & Tech)</strong></span>
+                  <span>Enterprise Multi-Tenant Cloud Architecture • Row Level Security (RLS)</span>
                 </div>
                 <span className="text-[11px] font-semibold text-emerald-500">Real Database Telemetry Active</span>
               </div>

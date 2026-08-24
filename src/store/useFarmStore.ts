@@ -6,8 +6,6 @@ import { supabase } from '@/lib/supabaseClient';
 
 export type Theme = 'light' | 'dark' | 'spatial' | 'spatial-glass' | 'vibe' | 'liquid' | 'obsidian' | 'liquid-glass';
 
-export const ALLOWED_PHONES = ['9502828293', '9849852085'];
-
 export interface User {
   id: string;
   name: string;
@@ -181,6 +179,7 @@ interface FarmState {
   setSidebarOpen: (open: boolean) => void;
   loginWithPhone: (phone: string) => Promise<{ success: boolean; error?: string }>;
   setUserFromSupabase: (supabaseUser: any) => void;
+  updateUserProfile: (name: string, role?: string) => void;
   logout: () => Promise<void>;
 
   // Data Fetching & Sync
@@ -375,16 +374,15 @@ export const useFarmStore = create<FarmState>()(
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-      // Strict Phone Authentication for exclusive admins John and Pranay
+      // Phone Authentication with user's own custom name
       loginWithPhone: async (phone: string) => {
         const cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (ALLOWED_PHONES.includes(cleanPhone)) {
-          const isJohn = cleanPhone === '9502828293';
+        if (cleanPhone.length >= 10) {
           const userObj: User = {
             id: `usr-${cleanPhone}`,
-            name: isJohn ? 'John' : 'Pranay',
+            name: get().user?.name || `Farmer ${cleanPhone.slice(-4)}`,
             phone: cleanPhone,
-            role: isJohn ? 'Farm Owner' : 'Manager & Tech Lead',
+            role: 'Farm Lead',
           };
           set({ user: userObj, isAuthenticated: true });
 
@@ -404,7 +402,7 @@ export const useFarmStore = create<FarmState>()(
 
           return { success: true };
         }
-        return { success: false, error: 'Access Denied: Only John (9502828293) and Pranay (9849852085) are authorized admins.' };
+        return { success: false, error: 'Please enter a valid 10-digit phone number.' };
       },
 
       setUserFromSupabase: (supabaseUser: any) => {
@@ -417,10 +415,31 @@ export const useFarmStore = create<FarmState>()(
           name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Poultry Farmer',
           email: supabaseUser.email,
           phone: supabaseUser.phone || '',
-          role: 'Admin',
+          role: 'Farm Owner',
           avatar: supabaseUser.user_metadata?.avatar_url || '',
         };
         set({ user: userObj, isAuthenticated: true });
+      },
+
+      updateUserProfile: (name: string, role?: string) => {
+        const currentUser = get().user;
+        if (currentUser) {
+          set({
+            user: {
+              ...currentUser,
+              name: name.trim(),
+              role: role || currentUser.role,
+            },
+          });
+        } else {
+          set({
+            user: {
+              id: 'custom-user',
+              name: name.trim(),
+              role: role || 'Farm Owner',
+            },
+          });
+        }
       },
 
       logout: async () => {
