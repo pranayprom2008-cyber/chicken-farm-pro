@@ -88,10 +88,15 @@ export default function Header() {
         {/* User Profile Avatar */}
         <Link
           href="/dashboard/settings"
-          className="w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 border border-emerald-400/30 cursor-pointer flex-shrink-0"
-          title="User Profile & Settings"
+          className="w-9 h-9 rounded-2xl flex items-center justify-center text-xs font-bold transition-all bg-emerald-600 hover:bg-emerald-500 text-white shadow-md shadow-emerald-600/30 border border-emerald-400/30 cursor-pointer flex-shrink-0 overflow-hidden"
+          title={user?.name ? `${user.name} (${user.email || user.role || 'Admin'})` : 'User Profile & Settings'}
         >
-          {initials}
+          {user?.avatar ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+          ) : (
+            initials
+          )}
         </Link>
       </div>
     </header>

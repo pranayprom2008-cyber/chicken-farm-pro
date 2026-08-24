@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import ThemeInitializer from "@/components/ThemeInitializer";
+import AuthProvider from "@/components/AuthProvider";
 
 export const metadata: Metadata = {
   title: "ChickFarm Pro - Commercial Chicken Farm Management",
@@ -60,8 +61,10 @@ export default function RootLayout({
         />
       </head>
       <body className="antialiased bg-[var(--bg-primary)] text-[var(--text-primary)] transition-colors duration-500" suppressHydrationWarning>
-        <ThemeInitializer />
-        {children}
+        <AuthProvider>
+          <ThemeInitializer />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );

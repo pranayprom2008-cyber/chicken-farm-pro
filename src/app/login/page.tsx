@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useFarmStore } from '@/store/useFarmStore';
+import { supabase, isSupabaseConfigured } from '@/lib/supabaseClient';
 import {
   Phone,
   Sparkles,
@@ -25,6 +26,7 @@ export default function LoginPage() {
   const [phone, setPhone] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
 
   useEffect(() => {
     setMounted(true);
@@ -35,6 +37,35 @@ export default function LoginPage() {
       router.replace('/dashboard');
     }
   }, [mounted, isAuthenticated, router]);
+
+  // Real Google OAuth through Supabase Auth
+  const handleGoogleLogin = async () => {
+    setError('');
+    setGoogleLoading(true);
+
+    if (!isSupabaseConfigured || !supabase) {
+      // Graceful local development notice if env vars are pending
+      setError('Supabase credentials pending in environment. You can also use authorized Admin access below.');
+      setGoogleLoading(false);
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth/callback`,
+        },
+      });
+      if (error) {
+        setError(error.message);
+        setGoogleLoading(false);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to initiate Google Login');
+      setGoogleLoading(false);
+    }
+  };
 
   const handlePhoneLogin = async (e?: React.FormEvent, directNumber?: string) => {
     if (e) e.preventDefault();
@@ -82,25 +113,65 @@ export default function LoginPage() {
           <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[var(--text-primary)]">
             ChickFarm Pro
           </h1>
+          <p className="text-xs text-[var(--text-secondary)] mt-1">
+            Enterprise Cloud Poultry Management OS
+          </p>
         </div>
 
-        {/* Login 3D Tilt Card */}
+        {/* Login Card */}
         <TiltCard maxTilt={6} glare={true}>
-          <div className="p-6 sm:p-8 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-base font-bold text-[var(--text-primary)]">
-                Authorized Phone Access
-              </h2>
-              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>Direct PINless Auth</span>
-              </div>
+          <div className="p-6 sm:p-8 rounded-3xl border border-[var(--border-color)] bg-[var(--bg-card)] shadow-xl space-y-6">
+            
+            {/* Google OAuth Button */}
+            <div>
+              <button
+                type="button"
+                onClick={handleGoogleLogin}
+                disabled={googleLoading}
+                className="w-full py-3.5 px-4 rounded-2xl border border-[var(--border-color)] bg-[var(--bg-input)] hover:bg-[var(--bg-card-hover)] font-bold text-sm text-[var(--text-primary)] flex items-center justify-center gap-3 transition-all duration-200 shadow-md hover:border-emerald-500/50 active:scale-[0.98]"
+              >
+                {googleLoading ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                      <path
+                        fill="#4285F4"
+                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+                      />
+                      <path
+                        fill="#34A853"
+                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+                      />
+                      <path
+                        fill="#FBBC05"
+                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+                      />
+                      <path
+                        fill="#EA4335"
+                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+                      />
+                    </svg>
+                    <span>Continue with Google</span>
+                  </>
+                )}
+              </button>
             </div>
 
+            {/* Divider */}
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-[var(--border-color)]" />
+              <span className="text-[11px] font-semibold text-[var(--text-muted)] uppercase tracking-wider">
+                or admin phone
+              </span>
+              <div className="flex-1 h-px bg-[var(--border-color)]" />
+            </div>
+
+            {/* Phone Authentication Form */}
             <form onSubmit={(e) => handlePhoneLogin(e)} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-[var(--text-secondary)] mb-1.5">
-                  Registered Phone Number
+                  Authorized Phone Number
                 </label>
                 <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5">
@@ -121,7 +192,7 @@ export default function LoginPage() {
               {/* Quick Login Chips */}
               <div>
                 <span className="text-[11px] text-[var(--text-muted)] block mb-1.5">
-                  Quick Select Authorized Numbers:
+                  Quick Select Admins:
                 </span>
                 <div className="grid grid-cols-2 gap-2">
                   <button

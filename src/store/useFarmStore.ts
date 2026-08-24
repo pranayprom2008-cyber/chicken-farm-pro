@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { supabase } from '@/lib/supabaseClient';
 
 export type Theme = 'light' | 'dark' | 'spatial' | 'spatial-glass' | 'vibe' | 'liquid' | 'obsidian' | 'liquid-glass';
 
@@ -179,7 +180,8 @@ interface FarmState {
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
   loginWithPhone: (phone: string) => Promise<{ success: boolean; error?: string }>;
-  logout: () => void;
+  setUserFromSupabase: (supabaseUser: any) => void;
+  logout: () => Promise<void>;
 
   // Data Fetching & Sync
   fetchDashboardData: () => Promise<void>;
@@ -405,7 +407,30 @@ export const useFarmStore = create<FarmState>()(
         return { success: false, error: 'Access Denied: Only John (9502828293) and Pranay (9849852085) are authorized admins.' };
       },
 
-      logout: () => {
+      setUserFromSupabase: (supabaseUser: any) => {
+        if (!supabaseUser) {
+          set({ user: null, isAuthenticated: false });
+          return;
+        }
+        const userObj: User = {
+          id: supabaseUser.id,
+          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Poultry Farmer',
+          email: supabaseUser.email,
+          phone: supabaseUser.phone || '',
+          role: 'Admin',
+          avatar: supabaseUser.user_metadata?.avatar_url || '',
+        };
+        set({ user: userObj, isAuthenticated: true });
+      },
+
+      logout: async () => {
+        if (supabase) {
+          try {
+            await supabase.auth.signOut();
+          } catch (e) {
+            console.warn('SignOut notice:', e);
+          }
+        }
         set({
           user: null,
           isAuthenticated: false,
