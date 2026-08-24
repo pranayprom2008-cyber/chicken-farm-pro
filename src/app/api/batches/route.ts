@@ -1,23 +1,24 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import { d1 } from '@/lib/d1Client';
+import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
-// GET all batches from Cloudflare D1 / Database
+// GET all batches from Database with fallback
 export async function GET() {
   try {
-    // 1. Fetch from D1 / Database
-    const batches = await prisma.batch.findMany({
+    const dbBatches = await prisma.batch.findMany({
       include: {
         dailyRecords: { orderBy: { date: 'asc' } },
         expenses: true,
         salesRecords: true,
       },
       orderBy: { createdAt: 'desc' },
-    });
+    }).catch(() => []);
 
-    const formatted = (batches || []).map((b) => {
+    const source = (dbBatches && dbBatches.length > 0) ? dbBatches : (masterData.batches || []);
+
+    const formatted = source.map((b: any) => {
       const total = Number(b.totalChicks) || 5000;
       const dead = Number(b.deadChicks) || 0;
       const alive = Number(b.aliveChicks) || Math.max(0, total - dead);
@@ -60,7 +61,7 @@ export async function GET() {
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error('Error fetching batches:', error);
-    return NextResponse.json([]);
+    return NextResponse.json(masterData.batches || []);
   }
 }
 

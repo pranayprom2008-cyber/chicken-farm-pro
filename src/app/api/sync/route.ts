@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const [batches, expenses, sales, billingHistory, settings, notifications] = await Promise.all([
+    const [dbBatches, dbExpenses, dbSales, dbBilling, dbSettings, dbNotifications] = await Promise.all([
       prisma.batch.findMany({ include: { dailyRecords: true }, orderBy: { createdAt: 'desc' } }).catch(() => []),
       prisma.expense.findMany({ orderBy: { date: 'desc' } }).catch(() => []),
       prisma.sales.findMany({ orderBy: { saleDate: 'desc' } }).catch(() => []),
@@ -14,7 +15,13 @@ export async function GET() {
       prisma.notification.findMany({ orderBy: { createdAt: 'desc' } }).catch(() => []),
     ]);
 
-    const formattedBatches = (batches || []).map((b) => {
+    const batchesSource = (dbBatches && dbBatches.length > 0) ? dbBatches : (masterData.batches || []);
+    const expensesSource = (dbExpenses && dbExpenses.length > 0) ? dbExpenses : (masterData.expenses || []);
+    const salesSource = (dbSales && dbSales.length > 0) ? dbSales : (masterData.sales || []);
+    const billingSource = (dbBilling && dbBilling.length > 0) ? dbBilling : (masterData.billingHistory || []);
+    const settingsSource = dbSettings || masterData.farm || null;
+
+    const formattedBatches = batchesSource.map((b: any) => {
       const total = Number(b.totalChicks) || 5000;
       const dead = Number(b.deadChicks) || 0;
       const alive = Number(b.aliveChicks) || Math.max(0, total - dead);
@@ -56,21 +63,21 @@ export async function GET() {
 
     return NextResponse.json({
       batches: formattedBatches,
-      expenses: expenses || [],
-      sales: sales || [],
-      billingHistory: billingHistory || [],
-      settings: settings || null,
-      notifications: notifications || [],
+      expenses: expensesSource,
+      sales: salesSource,
+      billingHistory: billingSource,
+      settings: settingsSource,
+      notifications: dbNotifications || [],
       lastSynced: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('Error in sync GET:', error);
     return NextResponse.json({
-      batches: [],
-      expenses: [],
-      sales: [],
-      billingHistory: [],
-      settings: null,
+      batches: masterData.batches || [],
+      expenses: masterData.expenses || [],
+      sales: masterData.sales || [],
+      billingHistory: masterData.billingHistory || [],
+      settings: masterData.farm || null,
       notifications: [],
       lastSynced: new Date().toISOString(),
     });

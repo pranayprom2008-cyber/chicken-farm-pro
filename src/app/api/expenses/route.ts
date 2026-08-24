@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
+import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,10 +10,13 @@ export async function GET() {
     const expenses = await prisma.expense.findMany({
       orderBy: { date: 'desc' },
     });
-    return NextResponse.json(expenses || []);
+    if (expenses && expenses.length > 0) {
+      return NextResponse.json(expenses);
+    }
+    return NextResponse.json(masterData.expenses || []);
   } catch (error: any) {
     console.error('Error fetching expenses:', error);
-    return NextResponse.json([]);
+    return NextResponse.json(masterData.expenses || []);
   }
 }
 
