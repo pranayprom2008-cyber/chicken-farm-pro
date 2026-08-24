@@ -26,11 +26,32 @@
       "status": "growing",
       "notes": "Test Flock",
       "createdAt": "2026-08-16T10:22:43.160Z",
-      "updatedAt": "2026-08-16T10:22:43.160Z"
+      "updatedAt": "2026-08-24T14:29:00.372Z"
     }
   ],
   "DailyBatchRecord": [],
-  "Expense": [],
+  "Expense": [
+    {
+      "id": "EXP-1786987533691",
+      "batchId": null,
+      "category": "Other",
+      "amount": 2000,
+      "date": "2026-08-17T00:00:00.000Z",
+      "description": "ChickAI updated: Other expense",
+      "createdAt": "2026-08-24T14:29:00.388Z",
+      "updatedAt": "2026-08-24T14:29:00.388Z"
+    },
+    {
+      "id": "EXP-1786987482827",
+      "batchId": null,
+      "category": "Electricity",
+      "amount": 5000,
+      "date": "2026-08-17T00:00:00.000Z",
+      "description": "ChickAI logged: Electricity expense",
+      "createdAt": "2026-08-24T14:29:00.397Z",
+      "updatedAt": "2026-08-24T14:29:00.397Z"
+    }
+  ],
   "Feed": [],
   "Medicine": [],
   "Labour": [],

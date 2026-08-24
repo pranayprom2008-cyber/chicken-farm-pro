@@ -1,0 +1,82 @@
+{
+  "recoveryTimestamp": "2026-08-24T14:28:42.489Z",
+  "version": "1.0.0-UNIFIED-MASTER",
+  "sources": [
+    "Laptop Downloads: C:\\Users\\prana\\Downloads\\ChickFarm_Pro_Backup_2026-08-17.json",
+    "SQLite dev.db / backups/farm_backup_latest.json",
+    "Git History (Commit 6b2b37b)"
+  ],
+  "farm": {
+    "id": "farm_main",
+    "farmName": "GreenField Poultry Farm",
+    "location": "Hyderabad, India",
+    "ownerName": "John & Pranay",
+    "phone": "9502828293"
+  },
+  "batches": [
+    {
+      "id": "cmsvnoyxk000f7dwn6aaisw0t",
+      "batchNumber": "B-2026-01",
+      "batchName": "Flock 1",
+      "breedType": "Cobb 500 (Broiler)",
+      "startDate": "2026-08-16T00:00:00.000Z",
+      "expectedEndDate": "2026-09-30T00:00:00.000Z",
+      "actualEndDate": null,
+      "durationDays": 45,
+      "totalChicks": 5000,
+      "aliveChicks": 5000,
+      "deadChicks": 0,
+      "status": "growing",
+      "notes": "Test Flock",
+      "createdAt": "2026-08-16T10:22:43.160Z",
+      "updatedAt": "2026-08-16T10:22:43.160Z",
+      "dailyRecords": [],
+      "expenses": [],
+      "salesRecords": []
+    }
+  ],
+  "expenses": [
+    {
+      "id": "EXP-1786987533691",
+      "category": "Other",
+      "amount": 2000,
+      "description": "ChickAI updated: Other expense",
+      "date": "2026-08-17",
+      "batchId": null,
+      "createdAt": "2026-08-17T17:25:33.691Z"
+    },
+    {
+      "id": "EXP-1786987482827",
+      "category": "Electricity",
+      "amount": 5000,
+      "description": "ChickAI logged: Electricity expense",
+      "date": "2026-08-17",
+      "batchId": null,
+      "createdAt": "2026-08-17T17:24:42.827Z"
+    }
+  ],
+  "billingHistory": [
+    {
+      "id": "cmsvns8r0000k7dwn5cixnao6",
+      "batchId": null,
+      "type": "chick_purchase",
+      "chickRate": 222,
+      "numberOfChicks": 15,
+      "feedBags": null,
+      "fcrScore": null,
+      "totalAmount": 3330,
+      "notes": "Chick Purchase: 15 birds @ ₹222/unit",
+      "date": "2026-08-16T10:25:15.851Z",
+      "createdAt": "2026-08-16T10:25:15.852Z"
+    }
+  ],
+  "sales": [],
+  "settings": {
+    "farmName": "GreenField Bio-Secure Poultry Farm",
+    "currency": "₹",
+    "language": "en",
+    "theme": "liquid",
+    "location": "Hyderabad, India",
+    "ownerName": "Venkata Farms"
+  }
+}
