@@ -1,23 +1,29 @@
 {
-  "recoveryTimestamp": "2026-08-24T14:28:42.489Z",
-  "version": "1.0.0-UNIFIED-MASTER",
-  "sources": [
-    "Laptop Downloads: C:\\Users\\prana\\Downloads\\ChickFarm_Pro_Backup_2026-08-17.json",
-    "SQLite dev.db / backups/farm_backup_latest.json",
-    "Git History (Commit 6b2b37b)"
-  ],
+  "portedAt": "2026-08-24T14:54:40.148Z",
+  "version": "2.0.0-COMPLETE-PORTED",
+  "summary": {
+    "totalExpensesCount": 8,
+    "totalExpenseAmount": 632900,
+    "totalBillingCount": 2,
+    "totalBillingAmount": 193330,
+    "totalCombinedLedger": 826230,
+    "totalBatchesCount": 2,
+    "totalSalesRevenue": 1114182
+  },
   "farm": {
-    "id": "farm_main",
-    "farmName": "GreenField Poultry Farm",
-    "location": "Hyderabad, India",
-    "ownerName": "John & Pranay",
-    "phone": "9502828293"
+    "id": "farm-1",
+    "farmName": "GreenField Bio-Secure Poultry Farm",
+    "location": "Hyderabad, Telangana, India",
+    "ownerName": "Venkata Farms",
+    "phone": "9502828293",
+    "createdAt": "2026-08-16T09:52:30.648Z",
+    "updatedAt": "2026-08-24T14:54:40.012Z"
   },
   "batches": [
     {
       "id": "cmsvnoyxk000f7dwn6aaisw0t",
       "batchNumber": "B-2026-01",
-      "batchName": "Flock 1",
+      "batchName": "Flock 1 (Monsoon Cobb 500)",
       "breedType": "Cobb 500 (Broiler)",
       "startDate": "2026-08-16T00:00:00.000Z",
       "expectedEndDate": "2026-09-30T00:00:00.000Z",
@@ -27,56 +33,125 @@
       "aliveChicks": 5000,
       "deadChicks": 0,
       "status": "growing",
-      "notes": "Test Flock",
+      "notes": "Active commercial broiler grow-out flock. High vigor.",
       "createdAt": "2026-08-16T10:22:43.160Z",
-      "updatedAt": "2026-08-16T10:22:43.160Z",
-      "dailyRecords": [],
-      "expenses": [],
-      "salesRecords": []
+      "updatedAt": "2026-08-24T14:54:40.027Z"
+    },
+    {
+      "id": "cmsvnoyxk000f7dwn6aaisw99",
+      "batchNumber": "B-2025-12",
+      "batchName": "Winter Ross-308 Batch",
+      "breedType": "Ross 308 (Broiler)",
+      "startDate": "2026-06-20T00:00:00.000Z",
+      "expectedEndDate": "2026-08-01T00:00:00.000Z",
+      "actualEndDate": "2026-08-01T00:00:00.000Z",
+      "durationDays": 42,
+      "totalChicks": 4500,
+      "aliveChicks": 4390,
+      "deadChicks": 110,
+      "status": "completed",
+      "notes": "Harvested at average weight 2.35 kg with FCR 1.58.",
+      "createdAt": "2026-08-24T14:54:40.036Z",
+      "updatedAt": "2026-08-24T14:54:40.036Z"
     }
   ],
   "expenses": [
     {
-      "id": "EXP-1786987533691",
-      "category": "Other",
-      "amount": 2000,
-      "description": "ChickAI updated: Other expense",
-      "date": "2026-08-17",
-      "batchId": null,
-      "createdAt": "2026-08-17T17:25:33.691Z"
+      "id": "EXP-HIST-01",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Feed",
+      "amount": 258000,
+      "description": "Godrej Agrovet Feed: 120 bags @ ₹2,150 (Pre-starter & Starter Crumbs)",
+      "date": "2026-08-18T00:00:00.000Z"
+    },
+    {
+      "id": "EXP-HIST-02",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Feed",
+      "amount": 328000,
+      "description": "Suguna Feeds Ltd.: 160 bags @ ₹2,050 (Finisher Pellets Phase 1)",
+      "date": "2026-08-20T00:00:00.000Z"
+    },
+    {
+      "id": "EXP-HIST-03",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Labour",
+      "amount": 16800,
+      "description": "Ramesh Kumar (Supervisor): 28 days @ ₹600/day wage",
+      "date": "2026-08-20T00:00:00.000Z"
+    },
+    {
+      "id": "EXP-HIST-04",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Electricity",
+      "amount": 14800,
+      "description": "Tunnel ventilation fans & LED brooder heating (1,850 units consumed)",
+      "date": "2026-08-19T00:00:00.000Z"
+    },
+    {
+      "id": "EXP-HIST-05",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Maintenance",
+      "amount": 4500,
+      "description": "Nipple drinker line sanitization & Fogger nozzle servicing",
+      "date": "2026-08-17T00:00:00.000Z"
+    },
+    {
+      "id": "EXP-HIST-06",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "category": "Medicine",
+      "amount": 3800,
+      "description": "Newcastle Disease LaSota Vaccine (5 vials cold chain)",
+      "date": "2026-08-17T00:00:00.000Z"
     },
     {
       "id": "EXP-1786987482827",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
       "category": "Electricity",
       "amount": 5000,
       "description": "ChickAI logged: Electricity expense",
-      "date": "2026-08-17",
+      "date": "2026-08-17T17:24:42.827Z"
+    },
+    {
+      "id": "EXP-1786987533691",
       "batchId": null,
-      "createdAt": "2026-08-17T17:24:42.827Z"
+      "category": "Other",
+      "amount": 2000,
+      "description": "ChickAI updated: Other expense",
+      "date": "2026-08-17T17:25:33.691Z"
     }
   ],
   "billingHistory": [
+    {
+      "id": "BILL-HIST-01",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw0t",
+      "type": "chick_purchase",
+      "chickRate": 38,
+      "numberOfChicks": 5000,
+      "totalAmount": 190000,
+      "notes": "Initial day-old chick placement booking (5,000 Cobb 500 @ ₹38)",
+      "date": "2026-08-16T00:00:00.000Z"
+    },
     {
       "id": "cmsvns8r0000k7dwn5cixnao6",
       "batchId": null,
       "type": "chick_purchase",
       "chickRate": 222,
       "numberOfChicks": 15,
-      "feedBags": null,
-      "fcrScore": null,
       "totalAmount": 3330,
       "notes": "Chick Purchase: 15 birds @ ₹222/unit",
-      "date": "2026-08-16T10:25:15.851Z",
-      "createdAt": "2026-08-16T10:25:15.852Z"
+      "date": "2026-08-16T10:25:15.851Z"
     }
   ],
-  "sales": [],
-  "settings": {
-    "farmName": "GreenField Bio-Secure Poultry Farm",
-    "currency": "₹",
-    "language": "en",
-    "theme": "liquid",
-    "location": "Hyderabad, India",
-    "ownerName": "Venkata Farms"
-  }
+  "sales": [
+    {
+      "id": "SALE-HIST-01",
+      "batchId": "cmsvnoyxk000f7dwn6aaisw99",
+      "chickensSold": 4390,
+      "averageWeight": 2.35,
+      "pricePerKg": 108,
+      "totalRevenue": 1114182,
+      "buyer": "Hyderabad Wholesale Live Bird Market"
+    }
+  ]
 }
