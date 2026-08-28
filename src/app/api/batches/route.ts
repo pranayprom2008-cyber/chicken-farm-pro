@@ -1,10 +1,9 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
-// GET all batches from Database with fallback
+// GET all batches from Database
 export async function GET() {
   try {
     const dbBatches = await prisma.batch.findMany({
@@ -16,10 +15,8 @@ export async function GET() {
       orderBy: { createdAt: 'desc' },
     }).catch(() => []);
 
-    const source = (dbBatches && dbBatches.length > 0) ? dbBatches : (masterData.batches || []);
-
-    const formatted = source.map((b: any) => {
-      const total = Number(b.totalChicks) || 5000;
+    const formatted = (dbBatches || []).map((b: any) => {
+      const total = Number(b.totalChicks) || 0;
       const dead = Number(b.deadChicks) || 0;
       const alive = Number(b.aliveChicks) || Math.max(0, total - dead);
       const mortPct = total > 0 ? Number(((dead / total) * 100).toFixed(2)) : 0;
@@ -61,7 +58,7 @@ export async function GET() {
     return NextResponse.json(formatted);
   } catch (error: any) {
     console.error('Error fetching batches:', error);
-    return NextResponse.json(masterData.batches || []);
+    return NextResponse.json([]);
   }
 }
 
@@ -86,7 +83,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Batch Number is required.' }, { status: 400 });
     }
 
-    const total = Number(totalChicks) || 5000;
+    const total = Number(totalChicks) || 0;
     const dead = Number(deadChicks) || 0;
     const alive = Math.max(0, total - dead);
     const duration = Number(durationDays) || 45;

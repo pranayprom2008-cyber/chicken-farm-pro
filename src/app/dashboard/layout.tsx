@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/components/AuthProvider';
 import { useFarmStore } from '@/store/useFarmStore';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
@@ -9,27 +10,27 @@ import LiquidBackground from '@/components/LiquidBackground';
 import PageTransition from '@/components/PageTransition';
 import MobileNav from '@/components/MobileNav';
 import ChickAI from '@/components/ChickAI';
+import Floating3DChicken from '@/components/Floating3DChicken';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const { user, theme, isAuthenticated, syncAll } = useFarmStore();
   const router = useRouter();
-  const pathname = usePathname();
-  const [mounted, setMounted] = useState(false);
+  const { authState } = useAuth();
+  const { syncAll } = useFarmStore();
 
-  // Real-time Cloud Sync Engine (Cross-device real-time sync & fast revalidation)
   useEffect(() => {
-    setMounted(true);
-    syncAll();
+    if (authState === 'UNAUTHENTICATED') {
+      router.replace('/login');
+    }
+  }, [authState, router]);
 
-    // 1. Periodic background sync every 4 seconds
+  // Background sync while authenticated
+  useEffect(() => {
+    if (authState !== 'AUTHENTICATED') return;
+
+    syncAll();
     const syncInterval = setInterval(() => {
       syncAll();
-    }, 4000);
-
-    // 2. Real-time sync on window focus or tab visibility change
-    const handleFocus = () => {
-      syncAll();
-    };
+    }, 15000);
 
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') {
@@ -37,36 +38,33 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       }
     };
 
-    window.addEventListener('focus', handleFocus);
+    window.addEventListener('focus', syncAll);
     document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       clearInterval(syncInterval);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', syncAll);
       document.removeEventListener('visibilitychange', handleVisibility);
     };
-  }, [syncAll]);
+  }, [authState, syncAll]);
 
-  useEffect(() => {
-    if (mounted && isAuthenticated) {
-      syncAll();
-    }
-  }, [pathname, mounted, isAuthenticated, syncAll]);
-
-  useEffect(() => {
-    if (mounted && !isAuthenticated) {
-      router.push('/login');
-    }
-  }, [mounted, isAuthenticated, router]);
-
-  if (!mounted) {
+  // LOADING: show spinner while session restores
+  if (authState === 'LOADING') {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-primary)]">
-        <div className="w-10 h-10 rounded-full border-4 border-emerald-500/30 border-t-emerald-500 animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden">
+        <LiquidBackground />
+        <div className="relative z-10 flex flex-col items-center gap-4 text-center max-w-sm px-6">
+          <Floating3DChicken size={84} />
+          <div className="w-10 h-10 rounded-full border-4 border-emerald-500/20 border-t-emerald-500 animate-spin" />
+          <p className="text-xs font-semibold text-[var(--text-muted)] tracking-wider uppercase">
+            Restoring your farm session...
+          </p>
+        </div>
       </div>
     );
   }
 
+  // AUTHENTICATED: render the actual dashboard
   return (
     <div className="min-h-screen flex flex-col md:flex-row bg-[var(--bg-primary)] text-[var(--text-primary)] relative overflow-hidden">
       <LiquidBackground />

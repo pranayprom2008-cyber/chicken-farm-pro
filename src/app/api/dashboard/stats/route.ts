@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,9 +16,9 @@ export async function GET() {
     const dbExpenses = await prisma.expense.findMany().catch(() => []);
     const dbSales = await prisma.sales.findMany().catch(() => []);
 
-    const batches = (dbBatches && dbBatches.length > 0) ? dbBatches : (masterData.batches || []);
-    const expenses = (dbExpenses && dbExpenses.length > 0) ? dbExpenses : (masterData.expenses || []);
-    const sales = (dbSales && dbSales.length > 0) ? dbSales : (masterData.sales || []);
+    const batches = dbBatches || [];
+    const expenses = dbExpenses || [];
+    const sales = dbSales || [];
 
     const totalBatches = batches.length;
     const activeBatches = batches.filter((b: any) => b.status === 'growing').length;
@@ -78,10 +77,10 @@ export async function GET() {
     const netRealizedProfit = totalRevenue - totalExpenditure;
 
     const monthlyChartData = [
-      { month: 'Oct', expense: Math.round(totalExpenditure * 0.15), revenue: Math.round(totalRevenue * 0.1), profit: 0 },
-      { month: 'Nov', expense: Math.round(totalExpenditure * 0.25), revenue: Math.round(totalRevenue * 0.2), profit: 0 },
-      { month: 'Dec', expense: Math.round(totalExpenditure * 0.4), revenue: Math.round(totalRevenue * 0.35), profit: 0 },
-      { month: 'Jan', expense: Math.round(totalExpenditure * 0.7), revenue: Math.round(totalRevenue * 0.65), profit: 0 },
+      { month: 'Oct', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Nov', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Dec', expense: 0, revenue: 0, profit: 0 },
+      { month: 'Jan', expense: 0, revenue: 0, profit: 0 },
       { month: 'Feb', expense: totalExpenditure, revenue: totalRevenue, profit: netRealizedProfit },
     ];
 
@@ -100,7 +99,7 @@ export async function GET() {
       labourCost: categoryExpenses.labour,
       maintenanceCost: categoryExpenses.maintenance,
       totalExpenditure,
-      totalRevenue: totalRevenue > 0 ? totalRevenue : expectedRevenue,
+      totalRevenue,
       expectedRevenue,
       estimatedProfit,
       netRealizedProfit,
@@ -115,30 +114,30 @@ export async function GET() {
   } catch (error: any) {
     console.error('Error generating dashboard stats:', error);
     return NextResponse.json({
-      totalBatches: masterData.batches?.length || 2,
-      activeBatches: 1,
-      completedBatches: 1,
-      totalChicks: 9500,
-      aliveChicks: 9390,
-      deadChicks: 110,
-      mortalityPercentage: 1.16,
-      feedConsumed: 30400,
-      feedRemaining: 5700,
-      medicineCost: 3800,
-      electricityCost: 19800,
-      labourCost: 16800,
-      maintenanceCost: 4500,
-      totalExpenditure: 632900,
-      totalRevenue: 1114182,
-      expectedRevenue: 1269997,
-      estimatedProfit: 481282,
-      netRealizedProfit: 481282,
-      totalChickensSold: 4390,
-      electricityUnits: 2475,
-      categoryExpenses: { feed: 586000, medicine: 3800, electricity: 19800, labour: 16800, maintenance: 4500, chicks: 0, other: 2000 },
-      recentBatches: masterData.batches || [],
-      recentExpenses: masterData.expenses || [],
-      recentSales: masterData.sales || [],
+      totalBatches: 0,
+      activeBatches: 0,
+      completedBatches: 0,
+      totalChicks: 0,
+      aliveChicks: 0,
+      deadChicks: 0,
+      mortalityPercentage: 0,
+      feedConsumed: 0,
+      feedRemaining: 0,
+      medicineCost: 0,
+      electricityCost: 0,
+      labourCost: 0,
+      maintenanceCost: 0,
+      totalExpenditure: 0,
+      totalRevenue: 0,
+      expectedRevenue: 0,
+      estimatedProfit: 0,
+      netRealizedProfit: 0,
+      totalChickensSold: 0,
+      electricityUnits: 0,
+      categoryExpenses: { feed: 0, medicine: 0, electricity: 0, labour: 0, maintenance: 0, chicks: 0, other: 0 },
+      recentBatches: [],
+      recentExpenses: [],
+      recentSales: [],
       monthlyChartData: [],
     });
   }

@@ -10,11 +10,8 @@ export const supabase = isSupabaseConfigured
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-      },
-      realtime: {
-        params: {
-          eventsPerSecond: 10,
-        },
+        detectSessionInUrl: true,
+        storageKey: 'sb-chicken-farm-auth-token',
       },
     })
   : null;

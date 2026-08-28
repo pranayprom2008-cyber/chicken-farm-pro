@@ -203,7 +203,7 @@ export default function ReportsPage() {
           className="flex items-center gap-2 px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs shadow-lg shadow-emerald-600/25 transition-all cursor-pointer"
         >
           <ExcelIcon className="w-4 h-4" />
-          <span>Dispatch Weekly Excel (9849852085)</span>
+          <span>{settings?.phone ? `Dispatch Weekly Excel (${settings.phone})` : 'Dispatch Weekly Excel'}</span>
         </button>
       </div>
 

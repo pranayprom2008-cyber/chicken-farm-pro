@@ -13,6 +13,7 @@
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.112.4",
     "canvas-confetti": "^1.9.4",
+    "firebase": "^12.18.0",
     "framer-motion": "^13.1.0",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

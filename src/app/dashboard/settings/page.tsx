@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useFarmStore, Theme } from '@/store/useFarmStore';
+import { useAuth } from '@/components/AuthProvider';
 import {
   Settings as SettingsIcon,
   Save,
@@ -30,10 +31,10 @@ export default function SettingsPage() {
     theme,
     setTheme,
     saveSettings,
-    logout,
     fetchSettings,
   } = useFarmStore();
 
+  const { logout } = useAuth();
   const router = useRouter();
 
   const [farmName, setFarmName] = useState(settings.farmName || 'GreenField Bio-Secure Poultry Farm');

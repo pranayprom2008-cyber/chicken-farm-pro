@@ -248,6 +248,9 @@ export default function DashboardPage() {
     );
   }
 
+  const userEmail = user?.email;
+  const isLoggedIn = Boolean(userEmail);
+
   return (
     <div className="space-y-7 pb-12">
       {/* Category Filter Pills */}

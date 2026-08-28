@@ -154,6 +154,7 @@ export interface FarmSettings {
   theme: Theme;
   location?: string;
   ownerName?: string;
+  phone?: string;
 }
 
 interface FarmState {
@@ -177,7 +178,6 @@ interface FarmState {
   setTheme: (theme: Theme) => void;
   toggleSidebar: () => void;
   setSidebarOpen: (open: boolean) => void;
-  loginWithPhone: (phone: string) => Promise<{ success: boolean; error?: string }>;
   setUserFromSupabase: (supabaseUser: any) => void;
   updateUserProfile: (name: string, role?: string) => void;
   logout: () => Promise<void>;
@@ -334,6 +334,43 @@ function computeStatsFromState(batches: Batch[], expenses: Expense[], sales: Sal
   };
 }
 
+function getVaultKey(user: User | null): string {
+  if (!user) return 'farm_vault_guest';
+  const id = user.email || user.id || 'default';
+  return `farm_vault_${id.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+}
+
+export function saveUserVault(
+  user: User | null,
+  data: {
+    batches: Batch[];
+    expenses: Expense[];
+    sales: SaleRecord[];
+    billingHistory: BillingRecord[];
+    settings: FarmSettings;
+  }
+) {
+  if (typeof window === 'undefined') return;
+  try {
+    const key = getVaultKey(user);
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Failed to save to local vault:', e);
+  }
+}
+
+export function loadUserVault(user: User | null) {
+  if (typeof window === 'undefined') return null;
+  try {
+    const key = getVaultKey(user);
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+  } catch (e) {
+    console.warn('Failed to load from local vault:', e);
+  }
+  return null;
+}
+
 export const useFarmStore = create<FarmState>()(
   persist(
     (set, get) => ({
@@ -374,70 +411,90 @@ export const useFarmStore = create<FarmState>()(
       toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
       setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-      // Phone Authentication with user's own custom name
-      loginWithPhone: async (phone: string) => {
-        const cleanPhone = phone.replace(/[^0-9]/g, '');
-        if (cleanPhone.length >= 10) {
-          const userObj: User = {
-            id: `usr-${cleanPhone}`,
-            name: get().user?.name || `Farmer ${cleanPhone.slice(-4)}`,
-            phone: cleanPhone,
-            role: 'Farm Lead',
-          };
-          set({ user: userObj, isAuthenticated: true });
-
-          // Immediately sync all cloud farm data
-          await get().syncAll();
-
-          // Try server login in background
-          try {
-            fetch('/api/auth/login', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ phone: cleanPhone }),
-            });
-          } catch {
-            // ignore
-          }
-
-          return { success: true };
-        }
-        return { success: false, error: 'Please enter a valid 10-digit phone number.' };
-      },
-
       setUserFromSupabase: (supabaseUser: any) => {
         if (!supabaseUser) {
-          set({ user: null, isAuthenticated: false });
+          set({
+            user: null,
+            isAuthenticated: false,
+            batches: [],
+            expenses: [],
+            sales: [],
+            billingHistory: [],
+          });
+          get().recalculateStats();
           return;
         }
+
+        const userEmail = supabaseUser.email || '';
         const userObj: User = {
           id: supabaseUser.id,
-          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || supabaseUser.email?.split('@')[0] || 'Poultry Farmer',
-          email: supabaseUser.email,
+          name: supabaseUser.user_metadata?.full_name || supabaseUser.user_metadata?.name || userEmail.split('@')[0] || 'Farm Owner',
+          email: userEmail,
           phone: supabaseUser.phone || '',
-          role: 'Farm Owner',
+          role: supabaseUser.user_metadata?.role || 'Farm Owner',
           avatar: supabaseUser.user_metadata?.avatar_url || '',
         };
-        set({ user: userObj, isAuthenticated: true });
+
+        // Strict per-user isolated data partition
+        const userVault = loadUserVault(userObj);
+        if (userVault) {
+          set({
+            user: userObj,
+            isAuthenticated: true,
+            batches: Array.isArray(userVault.batches) ? userVault.batches : [],
+            expenses: Array.isArray(userVault.expenses) ? userVault.expenses : [],
+            sales: Array.isArray(userVault.sales) ? userVault.sales : [],
+            billingHistory: Array.isArray(userVault.billingHistory) ? userVault.billingHistory : [],
+            settings: userVault.settings ? { ...defaultSettings, ...userVault.settings } : { ...defaultSettings, ownerName: userObj.name },
+          });
+        } else {
+          set({
+            user: userObj,
+            isAuthenticated: true,
+            batches: [],
+            expenses: [],
+            sales: [],
+            billingHistory: [],
+            settings: { ...defaultSettings, ownerName: userObj.name },
+          });
+        }
+        get().recalculateStats();
       },
 
       updateUserProfile: (name: string, role?: string) => {
         const currentUser = get().user;
         if (currentUser) {
-          set({
-            user: {
-              ...currentUser,
-              name: name.trim(),
-              role: role || currentUser.role,
-            },
+          const updatedUser = {
+            ...currentUser,
+            name: name.trim(),
+            role: role || currentUser.role,
+          };
+          set({ user: updatedUser });
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('chicken_farm_remembered_user', JSON.stringify(updatedUser));
+            } catch {}
+          }
+          saveUserVault(updatedUser, {
+            batches: get().batches,
+            expenses: get().expenses,
+            sales: get().sales,
+            billingHistory: get().billingHistory,
+            settings: { ...get().settings, ownerName: updatedUser.name },
           });
         } else {
-          set({
-            user: {
-              id: 'custom-user',
-              name: name.trim(),
-              role: role || 'Farm Owner',
-            },
+          const newUser = {
+            id: 'custom-user',
+            name: name.trim(),
+            role: role || 'Farm Owner',
+          };
+          set({ user: newUser });
+          saveUserVault(newUser, {
+            batches: get().batches,
+            expenses: get().expenses,
+            sales: get().sales,
+            billingHistory: get().billingHistory,
+            settings: { ...get().settings, ownerName: newUser.name },
           });
         }
       },
@@ -453,7 +510,12 @@ export const useFarmStore = create<FarmState>()(
         set({
           user: null,
           isAuthenticated: false,
+          batches: [],
+          expenses: [],
+          sales: [],
+          billingHistory: [],
         });
+        get().recalculateStats();
       },
 
       recalculateStats: () => {
@@ -1136,3 +1198,19 @@ export const useFarmStore = create<FarmState>()(
     }
   )
 );
+
+// Automatic Real-Time Vault Persistence Per-Email
+if (typeof window !== 'undefined') {
+  useFarmStore.subscribe((state) => {
+    if (state.user && state.isAuthenticated) {
+      saveUserVault(state.user, {
+        batches: state.batches,
+        expenses: state.expenses,
+        sales: state.sales,
+        billingHistory: state.billingHistory,
+        settings: state.settings,
+      });
+    }
+  });
+}
+

@@ -175,7 +175,7 @@ export default function ChickAI() {
       { label: '🌡️ Sensor Telemetry', query: 'Show shed environment sensor readings' },
       { label: '🌾 Calculate FCR', query: 'Calculate FCR for my active batch' },
       { label: '💰 Add ₹1000 Feed', query: 'Add ₹1,000 for feed' },
-      { label: '📊 Weekly Excel Report', query: 'Generate weekly audit report for 9849852085 in Excel format' },
+      { label: '📊 Weekly Excel Report', query: 'Generate weekly farm audit report in Excel format' },
     ];
   };
 
@@ -1053,7 +1053,7 @@ export default function ChickAI() {
                   <div className="p-8 text-center text-slate-400 space-y-2">
                     <History className="w-8 h-8 mx-auto text-slate-600" />
                     <p className="text-xs">No AI database mutations executed in this session yet.</p>
-                    <p className="text-[11px] text-slate-500">Try saying: *"Add ₹1,000 for feed"* or *"Add 20 dead birds to Batch 45"*.</p>
+                    <p className="text-[11px] text-slate-500">Try saying: *"Add ₹1,000 for feed"* or *"Add 20 dead birds to active batch"*.</p>
                   </div>
                 ) : (
                   <div className="space-y-2">
@@ -1279,7 +1279,7 @@ export default function ChickAI() {
                               className="px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-2 shadow-lg shadow-emerald-600/30 transition-all cursor-pointer w-full justify-center"
                             >
                               <FileSpreadsheet className="w-4 h-4" />
-                              <span>Download Excel & Send to 9849852085</span>
+                              <span>Download & Dispatch Weekly Excel</span>
                             </button>
                           </div>
                         )}

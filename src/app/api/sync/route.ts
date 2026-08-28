@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/db';
-import masterData from '@/../backups/chicken-farm-recovery-master.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +14,8 @@ export async function GET() {
       prisma.notification.findMany({ orderBy: { createdAt: 'desc' } }).catch(() => []),
     ]);
 
-    const batchesSource = (dbBatches && dbBatches.length > 0) ? dbBatches : (masterData.batches || []);
-    const expensesSource = (dbExpenses && dbExpenses.length > 0) ? dbExpenses : (masterData.expenses || []);
-    const salesSource = (dbSales && dbSales.length > 0) ? dbSales : (masterData.sales || []);
-    const billingSource = (dbBilling && dbBilling.length > 0) ? dbBilling : (masterData.billingHistory || []);
-    const settingsSource = dbSettings || masterData.farm || null;
-
-    const formattedBatches = batchesSource.map((b: any) => {
-      const total = Number(b.totalChicks) || 5000;
+    const formattedBatches = (dbBatches || []).map((b: any) => {
+      const total = Number(b.totalChicks) || 0;
       const dead = Number(b.deadChicks) || 0;
       const alive = Number(b.aliveChicks) || Math.max(0, total - dead);
       const mortPct = total > 0 ? Number(((dead / total) * 100).toFixed(2)) : 0;
@@ -63,21 +56,21 @@ export async function GET() {
 
     return NextResponse.json({
       batches: formattedBatches,
-      expenses: expensesSource,
-      sales: salesSource,
-      billingHistory: billingSource,
-      settings: settingsSource,
+      expenses: dbExpenses || [],
+      sales: dbSales || [],
+      billingHistory: dbBilling || [],
+      settings: dbSettings || null,
       notifications: dbNotifications || [],
       lastSynced: new Date().toISOString(),
     });
   } catch (error: any) {
     console.error('Error in sync GET:', error);
     return NextResponse.json({
-      batches: masterData.batches || [],
-      expenses: masterData.expenses || [],
-      sales: masterData.sales || [],
-      billingHistory: masterData.billingHistory || [],
-      settings: masterData.farm || null,
+      batches: [],
+      expenses: [],
+      sales: [],
+      billingHistory: [],
+      settings: null,
       notifications: [],
       lastSynced: new Date().toISOString(),
     });

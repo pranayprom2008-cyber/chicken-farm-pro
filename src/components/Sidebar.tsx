@@ -40,7 +40,11 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const { sidebarOpen, setSidebarOpen, theme, setTheme, user, logout, notifications } = useFarmStore();
-  const initials = user?.name ? user.name.slice(0, 2).toUpperCase() : 'CF';
+
+  const userEmail = user?.email || '';
+  const initials = userEmail.length >= 2
+    ? userEmail.slice(0, 2).toUpperCase()
+    : (user?.name?.length ? user.name.slice(0, 2).toUpperCase() : 'ME');
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const cycleTheme = () => {
@@ -178,18 +182,23 @@ export default function Sidebar() {
             )}
           </div>
 
-          {/* User Profile Tile */}
-          <div className="flex items-center gap-3 p-2 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] overflow-hidden transition-all duration-200 hover:border-[var(--border-hover)]">
+          {/* User Profile Tile with Logged In Email */}
+          <div className="flex items-center gap-3 p-2.5 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-color)] overflow-hidden transition-all duration-200 hover:border-[var(--border-hover)]">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 bg-emerald-500 text-white shadow-sm shadow-emerald-500/20">
-              {initials}
+              {user?.avatar ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={user.avatar} alt={user.name} className="w-full h-full rounded-xl object-cover" />
+              ) : (
+                initials
+              )}
             </div>
             {sidebarOpen && (
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-bold text-[var(--text-primary)] truncate tracking-tight">
-                  {user?.name || 'Authorized Farmer'}
+                  {user?.name || 'Farm Lead'}
                 </p>
-                <p className="text-[10px] text-[var(--text-muted)] truncate font-medium">
-                  {user?.role || 'Admin'}
+                <p className="text-[10px] text-emerald-400 font-semibold truncate">
+                  {user?.email || '🟢 Google Connected'}
                 </p>
               </div>
             )}
@@ -197,7 +206,7 @@ export default function Sidebar() {
               <button
                 onClick={logout}
                 className="p-1.5 rounded-xl text-[var(--text-muted)] hover:text-rose-400 hover:bg-rose-500/10 transition-colors flex-shrink-0 cursor-pointer"
-                title="Logout"
+                title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
               </button>
