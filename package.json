@@ -10,6 +10,8 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@google/genai": "^2.19.0",
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^5.22.0",
     "@supabase/supabase-js": "^2.112.4",
     "canvas-confetti": "^1.9.4",

@@ -736,6 +736,7 @@ export default function ChickAI() {
           clientContext,
           conversationContext: convContext,
           attachedImage,
+          userEmail: store.user?.email || 'mjohn.suji@gmail.com',
         }),
       });
 
@@ -910,6 +911,9 @@ export default function ChickAI() {
                       <span>✨ CHICKAI</span>
                       <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-teal-500/20 text-teal-300 font-mono border border-teal-400/30">
                         FARM OS
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 font-mono border border-emerald-400/30 font-bold">
+                        GEMINI 3.1 FLASH-LITE
                       </span>
                     </h3>
                   </div>
